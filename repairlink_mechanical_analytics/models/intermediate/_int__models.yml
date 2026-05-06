@@ -1,0 +1,197 @@
+version: 2
+
+models:
+  - name: int_repairlink__dealer
+    description: >
+      One row per dealer, deduplicated to the most recent trial record.
+      Enriched with OEM enrollment aggregates (from stg_repairlink__dealeroemenrollment)
+      and dealer network connection count (from stg_repairlink__dealer_mapper).
+      Clean dealer entity ready for dimensional shaping in marts.
+    columns:
+      - name: dealer_id
+        description: Natural key for the dealer.
+        tests: [not_null, unique]
+      - name: status_id
+        description: Most recent trial status code for the dealer. All current records = 1.
+      - name: trial_started_at
+        description: When the most recent trial started.
+        tests: [not_null]
+      - name: trial_ended_at
+        description: When the most recent trial ended. Null if still active.
+      - name: created_at
+        description: Record creation timestamp.
+      - name: updated_at
+        description: Record last updated timestamp.
+      - name: total_oem_enrollment_count
+        description: Total number of OEM enrollments (active + inactive) for this dealer.
+      - name: active_oem_enrollment_count
+        description: Number of currently active OEM enrollments for this dealer.
+      - name: connected_dealer_count
+        description: Number of other dealers this dealer is connected to in the distance network.
+
+  - name: int_repairlink__shop
+    description: >
+      One row per shop, deduplicated to the most recent config record.
+      Clean shop entity ready for dimensional shaping in marts.
+    columns:
+      - name: shop_id
+        description: Natural key for the shop.
+        tests: [not_null, unique]
+      - name: location_code
+        description: Location code associated with the shop.
+      - name: order_type
+        description: Order type configured for the shop. All current records = 1.
+      - name: created_at
+        description: Record creation timestamp.
+      - name: updated_at
+        description: Record last updated timestamp.
+
+  - name: int_repairlink__manufacturer
+    description: >
+      One row per manufacturer. Passthrough from stg_repairlink__manufacturer
+      with the Unknown sentinel record (manufacturer_id = 0) excluded.
+      Ready for dim_manufacturer.
+    columns:
+      - name: manufacturer_id
+        description: Primary key for the manufacturer.
+        tests: [not_null, unique]
+      - name: manufacturer_name_long
+        description: Full display name of the manufacturer.
+        tests: [not_null]
+      - name: manufacturer_name_short
+        description: Short display name of the manufacturer.
+      - name: abbreviation
+        description: Abbreviated name of the manufacturer.
+      - name: manufacturer_key
+        description: Unique business key for the manufacturer.
+        tests: [not_null, unique]
+      - name: org_key
+        description: Organisation key. Sparsely populated — only present for a few manufacturers.
+      - name: industry_id
+        description: Industry segment (1 = Automotive OEM, 4 = Construction, 5 = Commercial Trucks).
+      - name: is_phoenix_published_inv
+        description: Whether the manufacturer publishes inventory in Phoenix.
+      - name: ingested_at
+        description: Fivetran sync timestamp.
+
+  - name: int_repairlink__country
+    description: >
+      One row per country. Passthrough from stg_repairlink__countrymaster
+      with the Unknown sentinel record (country_id = 0) excluded.
+      239 active countries. Ready for dim_country.
+    columns:
+      - name: country_id
+        description: Primary key and ISO 3166-1 numeric country code.
+        tests: [not_null, unique]
+      - name: country_name
+        description: Full formal country name.
+        tests: [not_null]
+      - name: two_letter_iso_code
+        description: ISO 3166-1 alpha-2 code (e.g. US, GB).
+        tests: [not_null]
+      - name: three_letter_iso_code
+        description: ISO 3166-1 alpha-3 code (e.g. USA, GBR).
+        tests: [not_null]
+      - name: ingested_at
+        description: Fivetran sync timestamp.
+
+  - name: int_repairlink__currency
+    description: >
+      One row per currency. Passthrough from stg_repairlink__currencymaster
+      with the Unknown sentinel record (currency_id = 0) excluded.
+      164 active currencies. Ready for dim_currency.
+    columns:
+      - name: currency_id
+        description: Primary key and ISO 4217 numeric currency code (e.g. 840 = USD, 978 = EUR).
+        tests: [not_null, unique]
+      - name: currency_name
+        description: Full name of the currency.
+        tests: [not_null]
+      - name: currency_code
+        description: ISO 4217 three-letter alphabetic code (e.g. USD, EUR).
+        tests: [not_null]
+      - name: ingested_at
+        description: Fivetran sync timestamp.
+
+  - name: int_repairlink__vehicle
+    description: >
+      One row per physical vehicle, deduplicated by VIN to the most recent transaction record.
+      Excludes records with null VIN (~8% of source) and vehicle_year = 0 (unknown sentinel).
+      Ready for dim_vehicle.
+    columns:
+      - name: vehicle_id
+        description: Primary key from source (most recent transaction vehicle_id for this VIN).
+        tests: [not_null, unique]
+      - name: vin
+        description: Vehicle Identification Number. Present on all rows (null VINs excluded upstream).
+        tests: [not_null, unique]
+      - name: transaction_id
+        description: Foreign key to the most recent transaction this vehicle appeared in.
+      - name: vehicle_type_id
+        description: Foreign key to the vehicle type enum.
+      - name: vehicle_year
+        description: Model year of the vehicle. Ranges from 1 to 2027 (future model years valid). year = 0 excluded.
+      - name: vehicle_make
+        description: Vehicle manufacturer/brand. Always populated.
+        tests: [not_null]
+      - name: vehicle_model
+        description: Vehicle model name. Present in ~96% of records.
+      - name: vin_decoded_correctly
+        description: Whether the VIN was decoded. Always false in current data.
+      - name: created_at
+        description: Record creation timestamp.
+      - name: updated_at
+        description: Record last updated timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp.
+
+  - name: int_repairlink__contact
+    description: >
+      Contact entity records filtered to those with at least a name or org_name.
+      Transactional in nature — one record per transaction contact, not deduplicated by person.
+      The comment field and audit fields are excluded to reduce column count.
+      Ready for dim_contact.
+    columns:
+      - name: contact_id
+        description: Primary key for the contact.
+        tests: [not_null, unique]
+      - name: transaction_id
+        description: Foreign key to the associated transaction. Nullable.
+      - name: document_id
+        description: Foreign key to the associated document. Nullable.
+      - name: contact_type_id
+        description: Foreign key to the contact type enum (buyer, seller, etc.).
+      - name: org_name
+        description: Organisation name. Present when contact represents a business.
+      - name: org_key
+        description: Organisation key.
+      - name: first_name
+        description: Contact first name.
+      - name: last_name
+        description: Contact primary last name.
+      - name: email
+        description: Email address.
+      - name: phone_business
+        description: Business phone number.
+      - name: phone_mobile
+        description: Mobile phone number.
+      - name: address_line_1
+        description: Primary address line.
+      - name: city
+        description: City.
+      - name: state
+        description: State or province code.
+      - name: postal_code
+        description: Postal or ZIP code.
+      - name: country_code
+        description: Country code (text, not FK).
+      - name: latitude
+        description: Geographic latitude.
+      - name: longitude
+        description: Geographic longitude.
+      - name: created_at
+        description: Record creation timestamp.
+      - name: updated_at
+        description: Record last updated timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp.

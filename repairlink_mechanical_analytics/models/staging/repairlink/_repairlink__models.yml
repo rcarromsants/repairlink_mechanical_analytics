@@ -1,0 +1,368 @@
+version: 2
+
+models:
+  - name: stg_repairlink__dealertrial
+    description: >
+      Staged dealer trial records from RepairLink. One row per dealer trial entry.
+      Base source for dim_dealer. Only 18 records currently — all with status_id = 1.
+    columns:
+      - name: dealer_trial_id
+        description: Primary key for the dealer trial record.
+        tests: [not_null, unique]
+      - name: dealer_id
+        description: Natural key identifying the dealer.
+        tests: [not_null]
+      - name: status_id
+        description: Numeric status code representing the dealer's trial status. All current records have status_id = 1.
+      - name: trial_started_at
+        description: Timestamp when the dealer trial started (UTC).
+      - name: trial_ended_at
+        description: Timestamp when the dealer trial ended (UTC). Null if still active.
+      - name: created_at
+        description: Record creation timestamp (UTC).
+      - name: updated_at
+        description: Record last updated timestamp (UTC).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__shopconfig
+    description: >
+      Staged shop configuration records from RepairLink. One row per shop config entry.
+      Base source for dim_shop. Only 15 records currently — all with order_type = 1.
+    columns:
+      - name: shop_config_id
+        description: Primary key for the shop configuration record.
+        tests: [not_null, unique]
+      - name: shop_id
+        description: Natural key identifying the shop.
+        tests: [not_null]
+      - name: location_code
+        description: Location code associated with the shop.
+      - name: order_type
+        description: Numeric code representing the order type for the shop. All current records have order_type = 1.
+      - name: created_by
+        description: User who created the record.
+      - name: updated_by
+        description: User who last updated the record.
+      - name: created_at
+        description: Record creation timestamp.
+      - name: updated_at
+        description: Record last updated timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__suppliermapper
+    description: >
+      Staged supplier mapping records. Maps seller org keys to supplier numbers.
+      111 records total. seller_org_key follows the format '001-XXX-XXX'.
+      supplier_number is NOT unique — multiple seller_org_keys can map to the same supplier number.
+      Staging only — no downstream dimension for now.
+    columns:
+      - name: supplier_mapper_id
+        description: Primary key (source: ID).
+        tests: [not_null, unique]
+      - name: seller_org_key
+        description: Seller organisation key in format '001-XXX-XXX' (source: SELLERORGKEY).
+        tests: [not_null]
+      - name: supplier_number
+        description: >
+          Numeric supplier identifier (source: SUPPLIERNUMBER, stored as NUMBER).
+          Not unique — multiple seller_org_keys can resolve to the same supplier_number.
+        tests: [not_null]
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__shopusermapper
+    description: >
+      Staged shop-to-user mapping records. Staging only — no downstream dimension for now.
+    columns:
+      - name: shop_user_mapper_id
+        description: Primary key.
+        tests: [not_null, unique]
+      - name: user_id
+        description: User identifier.
+      - name: external_id
+        description: External identifier for the user in the shop context.
+      - name: created_by
+        description: User who created the record.
+      - name: updated_by
+        description: User who last updated the record.
+      - name: created_at
+        description: Record creation timestamp.
+      - name: updated_at
+        description: Record last updated timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__manufacturer
+    description: >
+      Staged manufacturer master records. One row per manufacturer. Base source for dim_manufacturer.
+      Includes 78 records covering vehicle OEMs (e.g. Ford, GM, Toyota), tire brands (e.g. Michelin, Goodyear),
+      and commercial truck manufacturers (e.g. Navistar, Daimler Truck).
+      manufacturer_id = 0 / 'Unknown' is a sentinel record.
+    columns:
+      - name: manufacturer_id
+        description: Primary key for the manufacturer (source: MANUFACTURERID). manufacturer_id = 0 is the sentinel for unknown manufacturer.
+        tests: [not_null, unique]
+      - name: manufacturer_name_long
+        description: Full display name of the manufacturer (source: NAMELONG, e.g. 'Ford Motor Company', 'General Motors').
+      - name: manufacturer_name_short
+        description: Short display name of the manufacturer (source: NAMESHORT, e.g. 'Ford', 'General Motors').
+      - name: abbreviation
+        description: Abbreviated name (source: ABBREVIATION, e.g. 'GM', 'DCX' for DaimlerChrysler).
+      - name: manufacturer_key
+        description: Unique business key identifying the manufacturer (source: MANUFACTURERKEY). Same value as abbreviation in most cases.
+        tests: [not_null, unique]
+      - name: org_key
+        description: >
+          Organisation key associated with the manufacturer (source: ORGKEY).
+          Sparsely populated — only present for a few manufacturers (e.g. GM: '001-CJ7-TU2-000', Hyundai: '001-W3Q-LC2-000').
+      - name: industry_id
+        description: >
+          Industry segment: 1 = Automotive OEM, 4 = Construction/Heavy Equipment, 5 = Commercial Trucks.
+          All tire brands fall under industry_id = 1.
+      - name: is_phoenix_published_inv
+        description: >
+          Whether the manufacturer publishes inventory in Phoenix.
+          True for major OEMs (e.g. GM, Ford, BMW, Mercedes-Benz); false for tire brands and most import OEMs.
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__countrymaster
+    description: >
+      Staged country reference records. One row per country. Base source for dim_country.
+      Includes 240 countries. country_id = 0 / country_name = 'Unknown' is a sentinel record
+      used when country is not applicable or not captured.
+    columns:
+      - name: country_id
+        description: Primary key for the country (source: COUNTRYID). country_id = 0 is the sentinel for unknown country.
+        tests: [not_null, unique]
+      - name: country_name
+        description: Full formal country name (source: COUNTRY). Names may include commas and formal designations (e.g. 'Albania, People's Socialist Republic of').
+      - name: two_letter_iso_code
+        description: ISO 3166-1 alpha-2 two-letter country code (e.g. US, GB). 'Unknown' for the sentinel record.
+      - name: three_letter_iso_code
+        description: ISO 3166-1 alpha-3 three-letter country code (e.g. USA, GBR). 'Unknown' for the sentinel record.
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__currencymaster
+    description: >
+      Staged currency reference records. One row per currency. Base source for dim_currency.
+      Includes 165 currencies. currency_id IS the ISO 4217 numeric code (e.g. 840 = USD, 978 = EUR),
+      not an arbitrary internal ID. currency_id = 0 / currency_name = 'Unknown' is a sentinel record.
+      Includes historical/deprecated currencies (e.g. EEK - Estonian Kroon, SKK - Slovak Koruna).
+    columns:
+      - name: currency_id
+        description: >
+          Primary key and ISO 4217 numeric currency code (source: CURRENCYID).
+          currency_id = 0 is the sentinel for unknown currency. Common values: 840 = USD, 978 = EUR, 826 = GBP.
+        tests: [not_null, unique]
+      - name: currency_name
+        description: Full name of the currency (source: CURRENCY). 'Unknown' for the sentinel record.
+      - name: currency_code
+        description: ISO 4217 three-letter alphabetic currency code (source: THREELETTERISOCODE, e.g. USD, EUR, GBP). 'Unknown' for the sentinel record.
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__vehicle
+    description: >
+      Staged vehicle entity records linked to transactions. 5.6M records total.
+      Transactional in nature — one vehicle record per transaction, not a deduplicated entity.
+      vehicle_year and vehicle_make are always populated (100%). VIN is present in ~92% of records.
+      vehicle_model is present in ~96% of records.
+      odometer_reading, all plate_* fields, and vin_decoded_correctly carry no data in current load (always null/false).
+    columns:
+      - name: vehicle_id
+        description: Primary key for the vehicle (source: VEHICLEID).
+        tests: [not_null, unique]
+      - name: transaction_id
+        description: Foreign key to the transaction this vehicle is associated with. Nullable — not always linked.
+      - name: document_id
+        description: Foreign key to the document this vehicle is associated with. Nullable.
+      - name: vehicle_type_id
+        description: Foreign key to the vehicle type enum (TRANSACTION_ENU_VEHICLETYPE).
+      - name: status_id
+        description: Numeric status code for the vehicle record.
+      - name: owner_id
+        description: Identifier of the vehicle owner.
+      - name: vin
+        description: Vehicle Identification Number (source: VINNUMBER). Present in ~92% of records; null for remaining ~8%.
+      - name: vin_decoded_correctly
+        description: Whether the VIN was successfully decoded. Always false in current data — VIN decoding is not implemented.
+      - name: vin_source
+        description: Source system or method used to capture the VIN.
+      - name: vehicle_year
+        description: Model year of the vehicle. Always populated. vehicle_year = 0 is a sentinel for unknown year. Values up to 2027 exist (future/pre-order model years are valid).
+      - name: vehicle_make
+        description: Vehicle manufacturer/brand (source: VEHICLEMAKE). Always populated.
+      - name: vehicle_model
+        description: Vehicle model name (source: VEHICLEMODEL). Present in ~96% of records.
+      - name: body_trim_code
+        description: Body trim code identifying the vehicle configuration.
+      - name: paint_exterior_color_code
+        description: Exterior paint color code.
+      - name: odometer_reading
+        description: Odometer reading at time of transaction (source: VEHICLEODOMETERREADING). Always null in current data.
+      - name: plate_number
+        description: Vehicle licence plate number. Always null in current data.
+      - name: plate_type
+        description: Type of licence plate. Always null in current data.
+      - name: plate_state_province
+        description: State or province that issued the plate. Always null in current data.
+      - name: plate_country_code_id
+        description: Foreign key to the country that issued the plate. Always null in current data.
+      - name: plate_expiration_date
+        description: Expiration date of the licence plate. Always null in current data.
+      - name: auto_pickup_at
+        description: Scheduled auto-pickup timestamp (source: TIMEAUTOPICKUP).
+      - name: auto_dropoff_at
+        description: Scheduled auto-dropoff timestamp (source: TIMEAUTODROPOFF).
+      - name: created_by
+        description: User who created the record.
+      - name: updated_by
+        description: User who last updated the record.
+      - name: created_at
+        description: Record creation timestamp.
+      - name: updated_at
+        description: Record last updated timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__contact
+    description: >
+      Staged contact entity records linked to transactions and documents. 57.7M records total.
+      Very high volume — transactional in nature; contacts are created per transaction/document, not deduplicated.
+      status_id = 1 for all records (no variability). Both transaction_id and document_id are nullable.
+    columns:
+      - name: contact_id
+        description: Primary key for the contact (source: CONTACTID).
+        tests: [not_null, unique]
+      - name: transaction_id
+        description: Foreign key to the transaction this contact is associated with. Nullable.
+      - name: document_id
+        description: Foreign key to the document this contact is associated with. Nullable.
+      - name: contact_type_id
+        description: Foreign key to the contact type enum (TRANSACTION_ENU_CONTACTTYPE — buyer, seller, etc.).
+      - name: status_id
+        description: Numeric status code for the contact record. Always = 1 in current data (57.7M records) — no variability observed.
+      - name: org_name
+        description: Organisation name associated with the contact.
+      - name: org_key
+        description: Organisation key associated with the contact.
+      - name: name_title
+        description: Title/salutation (e.g. Mr., Dr.).
+      - name: first_name
+        description: Contact first name (source: NAMEFIRST).
+      - name: middle_name
+        description: Contact middle name (source: NAMEMIDDLE).
+      - name: last_name
+        description: Contact primary last name (source: NAMELAST1).
+      - name: last_name_2
+        description: Contact secondary last name (source: NAMELAST2).
+      - name: name_suffix
+        description: Name suffix (e.g. Jr., III).
+      - name: nickname
+        description: Nickname or preferred name (source: NAMENICK).
+      - name: email
+        description: Email address.
+      - name: phone_business
+        description: Business phone number.
+      - name: phone_mobile
+        description: Mobile phone number.
+      - name: phone_fax
+        description: Fax number.
+      - name: address_line_1
+        description: Primary address line (source: ADDRESSLINE1).
+      - name: address_line_2
+        description: Secondary address line (source: ADDRESSLINE2).
+      - name: address_line_3
+        description: Tertiary address line (source: ADDRESSLINE3).
+      - name: city
+        description: City.
+      - name: state
+        description: State or province code.
+      - name: postal_code
+        description: Postal or ZIP code (source: POSTALCODE).
+      - name: country_code
+        description: Country code (source: COUNTRY — text code, not a FK).
+      - name: latitude
+        description: Geographic latitude of the contact location.
+      - name: longitude
+        description: Geographic longitude of the contact location.
+      - name: locale_code
+        description: Locale code for language/region settings (source: LOCALECODE).
+      - name: website
+        description: Website URL.
+      - name: comment
+        description: Free-text comment on the contact.
+      - name: created_by
+        description: User who created the record.
+      - name: updated_by
+        description: User who last updated the record.
+      - name: created_at
+        description: Record creation timestamp (source: CREATEDON).
+      - name: updated_at
+        description: Record last updated timestamp (source: UPDATEDON).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__dealeroemenrollment
+    description: >
+      Staged dealer OEM enrollment records. One row per enrollment. 8,481 records total.
+      Enriches dim_dealer with OEM relationship data. Top OEMs by enrollment count: GM (1,590), Ford (1,424), Chrysler (1,023).
+      oem_id maps to manufacturer_id in stg_repairlink__manufacturer.
+    columns:
+      - name: dealer_oem_enrollment_id
+        description: Primary key for the enrollment record (source: ID).
+        tests: [not_null, unique]
+      - name: dealer_id
+        description: Dealer identifier. Foreign key to stg_repairlink__dealertrial.dealer_id.
+        tests: [not_null]
+      - name: oem_id
+        description: OEM identifier. Maps to manufacturer_id in stg_repairlink__manufacturer.
+        tests: [not_null]
+      - name: oem_name
+        description: >
+          Denormalised name of the OEM (source: OEMNAME). The same oem_id can appear with different
+          name values (e.g. oem_id=1 → 'Chrysler' and 'DCX'; oem_id=3 → 'General Motors' and 'GM').
+          Use stg_repairlink__manufacturer for the canonical name.
+      - name: is_active
+        description: Whether the enrollment is currently active (source: ISACTIVE). Majority are active; a small subset are inactive.
+      - name: created_at
+        description: Record creation timestamp in UTC (source: CREATEDONUTC).
+      - name: updated_at
+        description: Record last updated timestamp in UTC (source: UPDATEDONUTC).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__dealer_mapper
+    description: >
+      Staged dealer-to-dealer distance mapping records. 2,999 records total, all with status = 3.
+      No natural primary key in source — _fivetran_id is used as surrogate PK. Staging only for now.
+    columns:
+      - name: fivetran_id
+        description: Surrogate primary key assigned by Fivetran (source: _FIVETRAN_ID). No natural PK exists in the source table.
+        tests: [not_null, unique]
+      - name: dealer_id
+        description: Source dealer identifier.
+        tests: [not_null]
+      - name: connected_dealer_id
+        description: Connected dealer identifier.
+        tests: [not_null]
+      - name: group_id
+        description: Group the dealer pair belongs to.
+      - name: distance_km
+        description: Distance in kilometres between the two dealers. Stored as NUMBER(18,0) in source — integer precision only.
+      - name: status
+        description: Numeric status of the dealer mapping. All current records have status = 3; enum meaning not yet documented.
+      - name: created_by
+        description: User who created the record.
+      - name: updated_by
+        description: User who last updated the record.
+      - name: created_at
+        description: Record creation timestamp.
+      - name: updated_at
+        description: Record last updated timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.

@@ -1,0 +1,59 @@
+version: 2
+
+sources:
+  - name: repairlink
+    database: RAW
+    schema: REPAIRLINK_SQLSERVER_DBO
+    description: >
+      Raw data sourced from RepairLink SQL Server. Contains dealer, shop,
+      and transactional data used to build the RepairLink dimensional model.
+
+    tables:
+
+      - name: DEALERTRIAL
+        description: >
+          Contains trial and status information per dealer. Enriches dim_dealer
+          with dealer lifecycle/status data.
+
+      - name: SHOPCONFIG
+        description: >
+          Shop configuration table. Used as the base entity for dim_shop.
+
+      - name: SHOPUSERMAPPER
+        description: >
+          Maps user IDs to external shop IDs. Kept as staging/intermediate only for now.
+
+      - name: DEALER_MAPPER
+        description: >
+          Maps distances between dealer_id and connected_dealer_id.
+          Kept as staging/intermediate only for now.
+
+      - name: SUPPLIERMAPPER
+        description: >
+          Maps seller organisation keys to supplier numbers.
+          Staged for potential use in supplier-related dimensions.
+
+      - name: MASTER_ENT_MANUFACTURER
+        description: >
+          Master list of manufacturers. Base entity for dim_manufacturer.
+
+      - name: COUNTRYMASTER
+        description: >
+          Reference table for countries. Base entity for dim_country.
+
+      - name: CURRENCYMASTER
+        description: >
+          Reference table for currencies. Base entity for dim_currency.
+
+      - name: TRANSACTION_ENT_VEHICLE
+        description: >
+          Vehicle entities associated with transactions. Base entity for dim_vehicle.
+
+      - name: TRANSACTION_ENT_CONTACT
+        description: >
+          Contact entities associated with transactions. Base entity for dim_contact.
+
+      - name: DEALEROEMENROLLMENT
+        description: >
+          OEM enrollment records per dealer. Enriches dim_dealer with OEM relationship data.
+

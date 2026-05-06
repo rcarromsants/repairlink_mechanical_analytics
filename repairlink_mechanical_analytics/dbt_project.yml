@@ -1,0 +1,32 @@
+
+name: 'repairlink_mechanical_analytics'
+version: '1.0.0'
+
+profile: 'repairlink_mechanical_analytics'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  repairlink_mechanical_analytics:
+    staging:
+      +materialized: incremental
+      +database: STAGING
+      repairlink:
+        +schema: REPAIRLINK
+    intermediate:
+      +materialized: table
+      +database: INTERMEDIATE
+      +schema: INTERMEDIATE
+    marts:
+      +materialized: table
+      +database: MARTS
+      +schema: MARTS
