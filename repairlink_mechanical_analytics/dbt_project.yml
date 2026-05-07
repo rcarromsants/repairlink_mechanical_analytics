@@ -19,9 +19,8 @@ models:
   repairlink_mechanical_analytics:
     staging:
       +materialized: incremental
-      +database: STAGING
-      repairlink:
-        +schema: REPAIRLINK
+      +schema: STAGING
+
     intermediate:
       +materialized: table
       +database: INTERMEDIATE
