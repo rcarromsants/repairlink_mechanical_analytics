@@ -20,8 +20,7 @@ models:
     staging:
       +materialized: incremental
       +database: STAGING
-      repairlink:
-        +schema: REPAIRLINK
+      +schema: REPAIRLINK
     intermediate:
       +materialized: table
       +database: INTERMEDIATE
