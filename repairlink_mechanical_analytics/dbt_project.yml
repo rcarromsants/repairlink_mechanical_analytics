@@ -19,13 +19,10 @@ models:
   repairlink_mechanical_analytics:
     staging:
       +materialized: incremental
-      +database: STAGING
-      +schema: REPAIRLINK
+      +schema: staging
     intermediate:
       +materialized: table
-      +database: INTERMEDIATE
-      +schema: INTERMEDIATE
+      +schema: intermediate
     marts:
       +materialized: table
-      +database: MARTS
-      +schema: MARTS
+      +schema: marts
