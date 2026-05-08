@@ -66,7 +66,7 @@ models:
         tests: [not_null]
       - name: supplier_number
         description: >
-          Numeric supplier identifier (source: SUPPLIERNUMBER, stored as NUMBER).
+          Numeric supplier identifier (source SUPPLIERNUMBER, stored as NUMBER).
           Not unique — multiple seller_org_keys can resolve to the same supplier_number.
         tests: [not_null]
       - name: ingested_at
@@ -115,11 +115,11 @@ models:
         tests: [not_null, unique]
       - name: org_key
         description: >
-          Organisation key associated with the manufacturer (source: ORGKEY).
+          Organisation key associated with the manufacturer (source ORGKEY).
           Sparsely populated — only present for a few manufacturers (e.g. GM: '001-CJ7-TU2-000', Hyundai: '001-W3Q-LC2-000').
       - name: industry_id
         description: >
-          Industry segment: 1 = Automotive OEM, 4 = Construction/Heavy Equipment, 5 = Commercial Trucks.
+          Industry segment - 1 = Automotive OEM, 4 = Construction/Heavy Equipment, 5 = Commercial Trucks.
           All tire brands fall under industry_id = 1.
       - name: is_phoenix_published_inv
         description: >
@@ -155,8 +155,8 @@ models:
     columns:
       - name: currency_id
         description: >
-          Primary key and ISO 4217 numeric currency code (source: CURRENCYID).
-          currency_id = 0 is the sentinel for unknown currency. Common values: 840 = USD, 978 = EUR, 826 = GBP.
+          Primary key and ISO 4217 numeric currency code (source CURRENCYID).
+          currency_id = 0 is the sentinel for unknown currency. Common values - 840 = USD, 978 = EUR, 826 = GBP.
         tests: [not_null, unique]
       - name: currency_name
         description: Full name of the currency (source CURRENCY). 'Unknown' for the sentinel record.
@@ -324,7 +324,7 @@ models:
         tests: [not_null]
       - name: oem_name
         description: >
-          Denormalised name of the OEM (source: OEMNAME). The same oem_id can appear with different
+          Denormalised name of the OEM (source OEMNAME). The same oem_id can appear with different
           name values (e.g. oem_id=1 → 'Chrysler' and 'DCX'; oem_id=3 → 'General Motors' and 'GM').
           Use stg_repairlink__manufacturer for the canonical name.
       - name: is_active
