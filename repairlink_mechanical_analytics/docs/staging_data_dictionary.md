@@ -22,7 +22,7 @@ Tables that are operational, audit, log, or cross-reference (`*_AUD_*`, `*_HST_*
 ### Architecture flow
 
 ```
-STAGING (incremental, rename/cast)
+STAGING (incremental (for now) - should be review for view, rename/cast)
         │
         ├── stg_repairlink__dealertrial ───────────┐
         │   stg_repairlink__dealeroemenrollment ───►  int_repairlink__dealer ──► dim_dealer
