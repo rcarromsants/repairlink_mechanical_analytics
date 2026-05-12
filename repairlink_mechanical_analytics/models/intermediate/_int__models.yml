@@ -12,7 +12,10 @@ models:
         description: Natural key for the dealer.
         tests: [not_null, unique]
       - name: status_id
-        description: Most recent trial status code for the dealer. All current records = 1.
+        description: >
+          Most recent trial status code for the dealer.
+          NOTE: only one distinct value (1) observed in current dev data.
+          Variability expected once running on live production data.
       - name: trial_started_at
         description: When the most recent trial started.
         tests: [not_null]
@@ -27,7 +30,15 @@ models:
       - name: active_oem_enrollment_count
         description: Number of currently active OEM enrollments for this dealer.
       - name: connected_dealer_count
-        description: Number of other dealers this dealer is connected to in the distance network.
+        description: >
+          Number of other dealers this dealer is connected to in the distance network
+          (from stg_repairlink__dealer_mapper).
+          NOTE: this is currently always 0 in the development environment because the
+          18 dealers in DEALERTRIAL do not overlap with the population in DEALER_MAPPER
+          (validated 2026-05-12). The enrichment logic is correct; the result reflects
+          the available data, not a model defect. Once this pipeline runs against live
+          production data where the dealer populations align, this column will show
+          actual connection counts.
 
   - name: int_repairlink__shop
     description: >
@@ -40,7 +51,10 @@ models:
       - name: location_code
         description: Location code associated with the shop.
       - name: order_type
-        description: Order type configured for the shop. All current records = 1.
+        description: >
+          Order type configured for the shop.
+          NOTE: only one distinct value (1) observed in current dev data.
+          Variability expected once running on live production data.
       - name: created_at
         description: Record creation timestamp.
       - name: updated_at
@@ -105,7 +119,12 @@ models:
         description: Primary key and ISO 4217 numeric currency code (e.g. 840 = USD, 978 = EUR).
         tests: [not_null, unique]
       - name: currency_name
-        description: Full name of the currency.
+        description: >
+          Full name of the currency.
+          NOTE: currency_name is NOT unique — two distinct currencies share the name 'Kwacha'
+          (MWK = Malawian Kwacha, ZMK = Zambian Kwacha). This is a legitimate real-world overlap,
+          not a data quality issue. For joining and display, always use currency_code (ISO 4217
+          alpha-3) which IS unique, not currency_name.
         tests: [not_null]
       - name: currency_code
         description: ISO 4217 three-letter alphabetic code (e.g. USD, EUR).
@@ -128,7 +147,10 @@ models:
       - name: transaction_id
         description: Foreign key to the most recent transaction this vehicle appeared in.
       - name: vehicle_type_id
-        description: Foreign key to the vehicle type enum.
+        description: >
+          Foreign key to the vehicle type enum (TRANSACTION_ENU_VEHICLETYPE).
+          NOTE: only one distinct value (103) observed in current dev data.
+          Variability expected once running on live production data.
       - name: vehicle_year
         description: Model year of the vehicle. Ranges from 1 to 2027 (future model years valid). year = 0 excluded.
       - name: vehicle_make
@@ -137,7 +159,10 @@ models:
       - name: vehicle_model
         description: Vehicle model name. Present in ~96% of records.
       - name: vin_decoded_correctly
-        description: Whether the VIN was decoded. Always false in current data.
+        description: >
+          Whether the VIN was decoded.
+          NOTE: always false in current dev data — VIN decoding is not yet implemented
+          upstream. Variability expected once VIN decoding goes live.
       - name: created_at
         description: Record creation timestamp.
       - name: updated_at
