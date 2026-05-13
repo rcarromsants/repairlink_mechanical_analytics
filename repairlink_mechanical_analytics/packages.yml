@@ -1,5 +1,5 @@
 packages:
   - package: dbt-labs/dbt_utils
     version: [">=1.0.0", "<2.0.0"]
-  - package: partsteck/automotive_dimensions
+  - package: partstech/automotive_dimensions
     version: [">=1.0.0", "<2.0.0"]
