@@ -46,8 +46,8 @@ enriched as (
         d.vehicle_model as vehicle_model_original,
 
         -- New VIN intelligence values
-        v.make_nm as vehicle_make_vintelligence,
-        v.model_nm as vehicle_model_vintelligence,
+        v.mak_nm as vehicle_make_vintelligence,
+        v.mdl_desc as vehicle_model_vintelligence,
 
         -- Optional debugging / lineage
         v.vin_signi_pattrn_mask,
