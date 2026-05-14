@@ -51,8 +51,7 @@ enriched as (
 
         -- Optional debugging / lineage
         v.vin_signi_pattrn_mask,
-        v.model_year,
-        v.manufacturer_nm
+        v.mdl_year
 
     from deduped d
 
