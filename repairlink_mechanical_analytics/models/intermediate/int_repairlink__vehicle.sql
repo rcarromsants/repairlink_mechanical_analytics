@@ -51,7 +51,7 @@ enriched as (
 
         -- Optional debugging / lineage
         v.vin_signi_pattrn_mask,
-        v.mdl_year
+        v.mdl_yr
 
     from deduped d
 
