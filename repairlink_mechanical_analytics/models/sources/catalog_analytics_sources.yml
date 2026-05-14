@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: catalog_analytics
+    database: pt_analytics
+    schema: catalog_analytics
+
+    tables:
+      - name: vintelligence_datafile
+        description: VIN intelligence reference dataset used for vehicle enrichment and normalization.
