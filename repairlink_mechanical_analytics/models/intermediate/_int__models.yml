@@ -135,8 +135,9 @@ models:
   - name: int_repairlink__vehicle
     description: >
       One row per physical vehicle, deduplicated by VIN to the most recent transaction record.
-      Excludes records with null VIN (~8% of source) and vehicle_year = 0 (unknown sentinel).
-      Ready for dim_vehicle.
+      Excludes records with null VIN (~8% of source) 
+      Vehicle intermediate model enriched with Automotive Dimensions
+      VIN intelligence data for vehicle make and model standardization
     columns:
       - name: vehicle_id
         description: Primary key from source (most recent transaction vehicle_id for this VIN).
@@ -154,10 +155,12 @@ models:
       - name: vehicle_year
         description: Model year of the vehicle. Ranges from 1 to 2027 (future model years valid). year = 0 excluded.
       - name: vehicle_make
-        description: Vehicle manufacturer/brand. Always populated.
+        description: Vehicle manufacturer/brand. Always populated. Original vehicle make value from RepairLink source system.
+          Temporarily retained for validation and comparison against Automotive Dimensions standardized values.
         tests: [not_null]
       - name: vehicle_model
-        description: Vehicle model name. Present in ~96% of records.
+        description: Vehicle model name. Present in ~96% of records. Original vehicle model value from RepairLink source system.
+          Temporarily retained for validation and comparison purposes.
       - name: vin_decoded_correctly
         description: >
           Whether the VIN was decoded.
@@ -169,6 +172,19 @@ models:
         description: Record last updated timestamp.
       - name: ingested_at
         description: Fivetran sync timestamp.
+      - name: vehicle_make_vintelligence
+        description: >
+          Standardized vehicle make value enriched from Automotive Dimensions VIN intelligence dataset.
+      - name: vehicle_model_vintelligence
+        description: >
+          Standardized vehicle model value enriched from Automotive Dimensions VIN intelligence dataset.
+      - name: vin_vintelligence
+        description: >
+          VIN pattern mask from Automotive Dimensions used for VIN matching validation.
+      - name: vin_suffix_vehicle
+        description: >
+          Temporary validation field derived from RepairLink VIN.
+          Used to validate VIN matching logic with Automotive Dimensions.
 
   - name: int_repairlink__contact
     description: >
