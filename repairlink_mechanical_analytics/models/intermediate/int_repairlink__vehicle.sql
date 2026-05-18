@@ -66,7 +66,21 @@ enriched as (
        and substring(trim(d.vin), 10, 2)
             = substring(v.vin_signi_pattrn_mask, 10, 2)
 
+),
+
+-- Defensive final dedup: guarantee one row per VIN regardless of upstream join behaviour.
+-- If the vin_intelligence-side dedup above is working, this is a no-op.
+final as (
+
+    select *
+    from enriched
+    qualify row_number() over (
+        partition by vin
+        order by case when vehicle_make_vintelligence is not null then 0 else 1 end,
+                 vehicle_make_vintelligence nulls last
+    ) = 1
+
 )
 
 select *
-from enriched
+from final
