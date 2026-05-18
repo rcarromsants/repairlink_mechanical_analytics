@@ -13,9 +13,9 @@ dimension as (
         vehicle_type_id,
         status_id,
         vehicle_year,
-        -- Original RepairLink values
-        vehicle_make_original                            as vehicle_make,
-        vehicle_model_original                           as vehicle_model,
+        -- Original RepairLink values (from staging — kept for comparison until DAT-2341 resolves VIN intel coverage)
+        vehicle_make,
+        vehicle_model,
         -- Canonical values from VIN intelligence enrichment
         vehicle_make_vintelligence,
         vehicle_model_vintelligence,

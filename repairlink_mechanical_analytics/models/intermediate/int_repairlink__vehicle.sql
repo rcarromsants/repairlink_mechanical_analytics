@@ -20,13 +20,24 @@ deduped as (
     ) = 1 -- Keep the most recently updated record for each VIN, in case of duplicates - confirm with business if this is the desired behavior when there are duplicates
 ),
 
--- VIN intelligence reference dataset from Automotive Dimensions repository
+-- VIN intelligence reference dataset from Automotive Dimensions repository.
+-- Deduplicated on the join signature (first 8 chars + chars 10-11 of the VIN pattern mask)
+-- so the LEFT JOIN below stays one-to-one and doesn't fan out.
 vin_intelligence as (
 
-    select *
+    select
+        vin_signi_pattrn_mask,
+        mak_nm,
+        mdl_desc
     from {{ source('catalog_analytics', 'vintelligence_datafile') }}
+    qualify row_number() over (
+        partition by
+            left(vin_signi_pattrn_mask, 8),
+            substring(vin_signi_pattrn_mask, 10, 2)
+        order by mak_nm nulls last
+    ) = 1
 
-), 
+),
 
 enriched as (
 
@@ -41,9 +52,9 @@ enriched as (
 
         -- Original RepairLink values 
         -- Remove them once we have all the VIN records; there are many VINs with no matching records https://oeconnection.atlassian.net/browse/DAT-2341
-        d.vehicle_make as vehicle_make_original,
-        d.vehicle_model as vehicle_model_original,
-
+        -- d.vehicle_make 
+        --d.vehicle_model 
+        
         -- New VIN intelligence values
         v.mak_nm as vehicle_make_vintelligence,
         v.mdl_desc as vehicle_model_vintelligence
