@@ -46,7 +46,7 @@ final as (
         coalesce(c.connected_dealer_count, 0)       as connected_dealer_count
     from deduped d
     left join oem_enrollments e  on d.dealer_id = e.dealer_id
-    left join dealer_connections c on d.dealer_id = c.dealer_id
+    left join dealer_connections c on left(d.dealer_id,11) = c.dealer_id --we have only 11 chars in mapper
 )
 
 select * from final
