@@ -14,6 +14,7 @@ filtered as (
         first_name is not null
         or last_name is not null
         or org_name is not null
+        and contact_type_id != 102 
 ),
 
 final as (
@@ -22,12 +23,14 @@ final as (
         transaction_id,
         document_id,
         contact_type_id,
-        org_name,
+        -- Text normalization
+        -- org_name: uppercased, leading spaces removed
+        upper(ltrim(org_name))                              as org_name,
         org_key,
         name_title,
-        first_name,
+        initcap(first_name)                                 as first_name,
         middle_name,
-        last_name,
+        initcap(last_name)                                  as last_name,
         last_name_2,
         name_suffix,
         nickname,
@@ -36,10 +39,15 @@ final as (
         phone_mobile,
         phone_fax,
         address_line_1,
-        address_line_2,
+        upper(trim(regexp_replace(regexp_replace(
+                regexp_replace(
+                    address_line_2,
+                    '\\bSTE\\b',
+                    'SUITE'
+                ), '[-\\.\\#]',''),'\\s+',' '))) as address_line_2,
         address_line_3,
-        city,
-        state,
+        upper(ltrim(city))                                  as city,
+        upper(ltrim(state))                                 as state,
         postal_code,
         country_code,
         latitude,
