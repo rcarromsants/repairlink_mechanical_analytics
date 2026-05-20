@@ -14,7 +14,7 @@ filtered as (
         first_name is not null
         or last_name is not null
         or org_name is not null
-        and contact_type_id != 102 
+        --and contact_type_id != 102 
 ),
 
 final as (
