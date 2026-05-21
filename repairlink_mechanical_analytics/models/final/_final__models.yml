@@ -4,32 +4,151 @@ models:
 
   - name: dim_dealer
     description: >
-      Dealer dimension. One row per dealer plus one Unknown row (Type 1, current state only).
-      Surrogate key generated as an MD5 hash of dealer_id.
-      status_id and connected_dealer_count were intentionally dropped (only one distinct value in dev data).
+      Comprehensive dealer dimension. One row per dealer (11-char canonical id) plus
+      one Unknown row (Type 1, current state only). The dealer universe is the union of
+      all distinct dealer_ids across dealertrial, dealer_mapper (both ends) and
+      dealeroemenrollment — NOT the trial subset.
+      Enriched with OEM enrollment counts and the most-recent contact / organizational
+      info from int_repairlink__contact.
+      See dim_dealer_trial for the trial-specific lifecycle context.
     columns:
       - name: dealer_key
-        description: Surrogate key (MD5 hash of dealer_id; deterministic across rebuilds).
+        description: Surrogate key (MD5 hash of dealer_id).
         tests: [not_null, unique]
       - name: dealer_id
-        description: Natural key for the dealer ('UNKNOWN' for the late-arriving sentinel row).
+        description: 11-char canonical dealer identifier. 'UNKNOWN' for the sentinel row.
         tests: [not_null]
-      - name: dealer_trial_id
-        description: Primary key from the most recent trial record.
-      - name: total_oem_enrollment_count
+      - name: total_oem_count
         description: Total OEM enrollments (active + inactive) for this dealer.
-      - name: active_oem_enrollment_count
-        description: Currently active OEM enrollments for this dealer.
+      - name: active_oem_count
+        description: Currently active OEM enrollments.
+      - name: contact_type_id
+        description: Contact type associated with the enriched contact row. Nullable.
+      - name: org_name
+        description: Organisation name from contact enrichment, normalised (uppercase, leading spaces stripped).
+      - name: first_name
+        description: Primary contact first name (initcap).
+      - name: last_name
+        description: Primary contact last name (initcap).
+      - name: email
+      - name: phone_business
+      - name: phone_mobile
+      - name: address_line_1
+      - name: address_line_2
+        description: Normalised address line 2 (STE → SUITE, special chars removed).
+      - name: city
+        description: City, uppercased.
+      - name: state
+        description: State / province code, uppercased.
+      - name: postal_code
+      - name: country_code
+        description: ISO 3166-1 alpha-2 country code.
+
+  - name: dim_dealer_trial
+    description: >
+      Dealer trial dimension. One row per dealer trial record plus one Unknown row.
+      Holds the trial lifecycle/business-status context for the small subset of dealers
+      that have a trial record (18 rows in current dev data).
+      Joins to dim_dealer via the 11-char canonical dealer_id (dealer_id_full is the
+      original 15-char form kept for reference).
+    columns:
+      - name: dealer_trial_key
+        description: Surrogate key (MD5 hash of dealer_trial_id).
+        tests: [not_null, unique]
+      - name: dealer_trial_id
+        description: Source primary key.
+      - name: dealer_id
+        description: 11-char canonical dealer_id — joinable to dim_dealer.dealer_id.
+      - name: dealer_id_full
+        description: Original 15-char dealer_id from source (kept for traceability).
+      - name: status_id
+        description: >
+          Trial status code.
+          NOTE: only one distinct value (1) observed in current dev data.
       - name: trial_started_at
-        description: When the most recent trial started.
+        description: When the trial started (UTC).
       - name: trial_ended_at
-        description: When the most recent trial ended. Null if still active.
+        description: When the trial ended (UTC). Null if still active.
+      - name: is_active
+        description: Derived flag — true when trial_ended_at IS NULL.
       - name: created_at
-        description: Record creation timestamp.
       - name: updated_at
-        description: Record last updated timestamp.
       - name: ingested_at
-        description: Fivetran sync timestamp from the source row.
+
+  - name: dim_oem
+    description: >
+      OEM dimension. Distinct OEMs that dealers enroll with, sourced from
+      DEALEROEMENROLLMENT. oem_name is denormalised at source (same oem_id can appear
+      with multiple spellings); we pick the most frequent spelling per oem_id as the
+      canonical name.
+    columns:
+      - name: oem_key
+        description: Surrogate key (MD5 hash of oem_id).
+        tests: [not_null, unique]
+      - name: oem_id
+        description: Natural key.
+      - name: oem_name
+        description: Canonical OEM name (most frequent spelling per oem_id).
+
+  - name: bridge_dealer_oem
+    description: >
+      Many-to-many bridge table linking dealers to the OEMs they're enrolled with.
+      One row per enrollment record from DEALEROEMENROLLMENT.
+      Keys are deterministic MD5 hashes aligned with dim_dealer and dim_oem.
+    columns:
+      - name: dealer_key
+        description: FK to dim_dealer.dealer_key. MD5 hash of the 11-char dealer_id.
+        tests: [not_null]
+      - name: oem_key
+        description: FK to dim_oem.oem_key. MD5 hash of oem_id.
+        tests: [not_null]
+      - name: dealer_oem_enrollment_id
+        description: Source primary key (unique per enrollment row).
+        tests: [not_null, unique]
+      - name: dealer_id
+        description: 11-char canonical dealer_id.
+      - name: dealer_id_full
+        description: Original 15-char dealer_id from source.
+      - name: oem_id
+        description: OEM identifier.
+      - name: oem_name
+        description: OEM name as recorded on this specific enrollment row (may differ from canonical in dim_oem).
+      - name: is_active
+        description: Whether the enrollment is currently active.
+      - name: enrolled_at
+        description: When the enrollment was created (UTC).
+      - name: updated_at
+      - name: ingested_at
+
+  - name: bridge_dealer_distance
+    description: >
+      Many-to-many bridge table representing the dealer-to-dealer distance network.
+      One row per dealer pair from DEALER_MAPPER. Both keys point to dim_dealer.
+    columns:
+      - name: from_dealer_key
+        description: FK to dim_dealer.dealer_key for the source dealer.
+        tests: [not_null]
+      - name: to_dealer_key
+        description: FK to dim_dealer.dealer_key for the connected dealer.
+        tests: [not_null]
+      - name: fivetran_id
+        description: Source surrogate key (DEALER_MAPPER has no natural PK).
+        tests: [not_null, unique]
+      - name: from_dealer_id
+        description: 11-char canonical dealer_id (source side).
+      - name: to_dealer_id
+        description: 11-char canonical connected_dealer_id.
+      - name: group_id
+        description: Group / cluster the dealer pair belongs to.
+      - name: distance_km
+        description: Distance in kilometres between the two dealers.
+      - name: status
+        description: >
+          Numeric status of the dealer relationship.
+          NOTE: always = 3 in current dev data.
+      - name: created_at
+      - name: updated_at
+      - name: ingested_at
 
   - name: dim_shop
     description: >
@@ -49,42 +168,34 @@ models:
           Order type configured for the shop.
           NOTE: only one distinct value (1) observed in current dev data.
       - name: created_at
-        description: Record creation timestamp.
       - name: updated_at
-        description: Record last updated timestamp.
 
   - name: dim_manufacturer
     description: >
       Manufacturer dimension. One row per manufacturer plus one Unknown row (Type 1).
-      Covers vehicle OEMs, tire brands, and commercial truck makers.
+      Broader than dim_oem — covers vehicle OEMs, tire brands, and commercial truck makers.
       Sentinel (manufacturer_id = 0) excluded upstream at the intermediate layer.
     columns:
       - name: manufacturer_key
         description: Surrogate key (MD5 hash of manufacturer_id).
         tests: [not_null, unique]
       - name: manufacturer_id
-        description: Natural key.
       - name: manufacturer_name_long
-        description: Full display name (e.g. 'Ford Motor Company').
       - name: manufacturer_name_short
-        description: Short display name (e.g. 'Ford').
       - name: abbreviation
-        description: Abbreviated name (e.g. 'GM', 'DCX').
       - name: manufacturer_business_key
         description: Business key from source (renamed from manufacturer_key to avoid surrogate-key naming conflict).
       - name: org_key
-        description: Organisation key. Sparsely populated (only present for a few manufacturers).
+        description: Organisation key. Sparsely populated.
       - name: industry_id
         description: Industry segment (1 = Automotive OEM, 4 = Construction, 5 = Commercial Trucks).
       - name: is_phoenix_published_inv
-        description: Whether the manufacturer publishes inventory in Phoenix.
       - name: ingested_at
-        description: Fivetran sync timestamp.
 
   - name: dim_country
     description: >
-      Country dimension. One row per ISO country plus one Unknown row (Type 1).
-      Sentinel (country_id = 0) excluded upstream at the intermediate layer.
+      Country dimension. One row per ISO country plus one Unknown row.
+      Sentinel (country_id = 0) excluded upstream.
     columns:
       - name: country_key
         description: Surrogate key (MD5 hash of country_id).
@@ -92,20 +203,17 @@ models:
       - name: country_id
         description: Natural key and ISO 3166-1 numeric country code.
       - name: country_name
-        description: Full formal country name.
       - name: two_letter_iso_code
-        description: ISO 3166-1 alpha-2 code (e.g. US, GB). 'XX' for the Unknown sentinel.
+        description: ISO 3166-1 alpha-2 code. 'XX' for the Unknown sentinel.
       - name: three_letter_iso_code
-        description: ISO 3166-1 alpha-3 code (e.g. USA, GBR). 'XXX' for the Unknown sentinel.
+        description: ISO 3166-1 alpha-3 code. 'XXX' for the Unknown sentinel.
       - name: ingested_at
-        description: Fivetran sync timestamp.
 
   - name: dim_currency
     description: >
-      Currency dimension. One row per ISO currency plus one Unknown row (Type 1).
-      Sentinel (currency_id = 0) excluded upstream at the intermediate layer.
-      WARNING: currency_name is NOT unique (Kwacha appears twice — MWK + ZMK).
-      Always join on currency_code, never currency_name.
+      Currency dimension. One row per ISO currency plus one Unknown row.
+      Sentinel (currency_id = 0) excluded upstream.
+      WARNING: currency_name is NOT unique (Kwacha = MWK + ZMK). Always join on currency_code.
     columns:
       - name: currency_key
         description: Surrogate key (MD5 hash of currency_id).
@@ -115,29 +223,23 @@ models:
       - name: currency_name
         description: >
           Full name of the currency. NOT unique — 'Kwacha' refers to both MWK (Malawian) and ZMK (Zambian).
-          Use currency_code for joins / display.
       - name: currency_code
-        description: ISO 4217 three-letter alphabetic code (e.g. USD, EUR). 'XXX' for the Unknown sentinel.
+        description: ISO 4217 three-letter alphabetic code.
       - name: ingested_at
-        description: Fivetran sync timestamp.
 
   - name: dim_vehicle
     description: >
-      Vehicle dimension. One row per physical vehicle (deduplicated by VIN) plus one Unknown row (Type 1).
-      Surrogate key generated from VIN (the natural key after dedup).
-      Always-null columns (odometer, plate_*, document_id, owner_id, paint, body trim) dropped from
-      this layer based on data quality findings.
+      Vehicle dimension. One row per physical vehicle (deduplicated by VIN) plus one Unknown row.
+      Always-null columns dropped based on data quality findings.
     columns:
       - name: vehicle_key
         description: Surrogate key (MD5 hash of VIN).
         tests: [not_null, unique]
       - name: vin
-        description: Vehicle Identification Number. Natural key, unique after dedup.
+        description: Vehicle Identification Number.
         tests: [not_null]
       - name: vehicle_id
-        description: Source PK from the latest transaction row for this VIN.
       - name: transaction_id
-        description: Most recent transaction this vehicle appeared in.
       - name: vehicle_type_id
         description: >
           Foreign key to the vehicle type enum.
@@ -147,24 +249,21 @@ models:
           Numeric status code.
           NOTE: only one distinct value (1) observed in current dev data.
       - name: vehicle_year
-        description: Model year. Ranges 1–2027 (future model years valid). vehicle_year = 0 excluded upstream.
+        description: Model year. Ranges 1–2027. year = 0 excluded upstream.
       - name: vehicle_make
-        description: Vehicle make as captured in RepairLink source. Subject to capitalization inconsistencies.
+        description: Vehicle make from RepairLink source. Subject to capitalisation inconsistencies — see vehicle_make_vintelligence for canonical.
       - name: vehicle_model
-        description: Vehicle model as captured in RepairLink source.
+        description: Vehicle model from RepairLink source.
       - name: vehicle_make_vintelligence
         description: Canonical vehicle make from the VIN intelligence enrichment dataset.
       - name: vehicle_model_vintelligence
         description: Canonical vehicle model from the VIN intelligence enrichment dataset.
       - name: vin_vintelligence
-        description: VIN significant pattern mask from the VIN intelligence dataset (joinable to VINtelligence catalog).
+        description: VIN significant pattern mask from the VIN intelligence dataset.
       - name: vin_decoded_correctly
         description: >
           Whether the VIN was decoded.
-          NOTE: always false in current dev data — VIN decoding is not yet implemented upstream.
+          NOTE: always false in current dev data.
       - name: created_at
-        description: Record creation timestamp from source.
       - name: updated_at
-        description: Record last updated timestamp from source.
       - name: ingested_at
-        description: Fivetran sync timestamp.

@@ -3,42 +3,46 @@ version: 2
 models:
   - name: int_repairlink__dealer
     description: >
-      One row per dealer, deduplicated to the most recent trial record.
-      Enriched with OEM enrollment aggregates (from stg_repairlink__dealeroemenrollment)
-      and dealer network connection count (from stg_repairlink__dealer_mapper).
-      Clean dealer entity ready for dimensional shaping in marts.
+      Comprehensive dealer entity. One row per dealer_id (11-char canonical form),
+      built from the union of every dealer-source table: stg_repairlink__dealertrial,
+      stg_repairlink__dealer_mapper (both ends), and stg_repairlink__dealeroemenrollment.
+      Enriched with OEM enrollment counts (active + total) and the most-recent contact
+      row per dealer from int_repairlink__contact. This is the universe-level dealer
+      view, NOT the trial subset — see dim_dealer_trial for lifecycle/trial context.
     columns:
       - name: dealer_id
-        description: Natural key for the dealer.
+        description: 11-char canonical dealer identifier. Stripped form aligned with dealer_mapper.dealer_id.
         tests: [not_null, unique]
-      - name: status_id
-        description: >
-          Most recent trial status code for the dealer.
-          NOTE: only one distinct value (1) observed in current dev data.
-          Variability expected once running on live production data.
-      - name: trial_started_at
-        description: When the most recent trial started.
-        tests: [not_null]
-      - name: trial_ended_at
-        description: When the most recent trial ended. Null if still active.
-      - name: created_at
-        description: Record creation timestamp.
-      - name: updated_at
-        description: Record last updated timestamp.
-      - name: total_oem_enrollment_count
-        description: Total number of OEM enrollments (active + inactive) for this dealer.
-      - name: active_oem_enrollment_count
-        description: Number of currently active OEM enrollments for this dealer.
-      - name: connected_dealer_count
-        description: >
-          Number of other dealers this dealer is connected to in the distance network
-          (from stg_repairlink__dealer_mapper).
-          NOTE: this is currently always 0 in the development environment because the
-          18 dealers in DEALERTRIAL do not overlap with the population in DEALER_MAPPER
-          (validated 2026-05-12). The enrichment logic is correct; the result reflects
-          the available data, not a model defect. Once this pipeline runs against live
-          production data where the dealer populations align, this column will show
-          actual connection counts.
+      - name: total_oem_count
+        description: Total count of distinct OEMs this dealer is enrolled with (active + inactive).
+      - name: active_oem_count
+        description: Count of distinct currently-active OEM enrollments.
+      - name: contact_type_id
+        description: Contact type associated with the enriched contact row (nullable when no matching contact).
+      - name: org_name
+        description: Organisation name from int_repairlink__contact enrichment. Nullable.
+      - name: first_name
+        description: Primary contact first name from int_contact enrichment.
+      - name: last_name
+        description: Primary contact last name from int_contact enrichment.
+      - name: email
+        description: Primary contact email from int_contact enrichment.
+      - name: phone_business
+        description: Business phone from int_contact enrichment.
+      - name: phone_mobile
+        description: Mobile phone from int_contact enrichment.
+      - name: address_line_1
+        description: Address line 1 from int_contact enrichment.
+      - name: address_line_2
+        description: Address line 2 from int_contact enrichment (normalized).
+      - name: city
+        description: City from int_contact enrichment (uppercased).
+      - name: state
+        description: State / province code from int_contact enrichment (uppercased).
+      - name: postal_code
+        description: Postal / ZIP code from int_contact enrichment.
+      - name: country_code
+        description: ISO 3166-1 alpha-2 country code from int_contact enrichment.
 
   - name: int_repairlink__shop
     description: >
@@ -188,51 +192,67 @@ models:
 
   - name: int_repairlink__contact
     description: >
-      Contact entity records filtered to those with at least a name or org_name.
-      Transactional in nature — one record per transaction contact, not deduplicated by person.
-      The comment field and audit fields are excluded to reduce column count.
-      Ready for dim_contact.
+      Reusable organizational / contact context, NOT a transactional model.
+      Grain: one row per (org_key, contact_type_id). Per-row identifiers from source
+      (contact_id, transaction_id, document_id) are intentionally dropped — this model
+      exists to enrich entity dimensions (dim_dealer, dim_shop, etc.) with normalized
+      org/contact attributes, not to represent individual transaction interactions.
+      All text normalization (uppercase, initcap, address regex cleanup) is applied here.
     columns:
-      - name: contact_id
-        description: Primary key for the contact.
-        tests: [not_null, unique]
-      - name: transaction_id
-        description: Foreign key to the associated transaction. Nullable.
-      - name: document_id
-        description: Foreign key to the associated document. Nullable.
-      - name: contact_type_id
-        description: Foreign key to the contact type enum (buyer, seller, etc.).
-      - name: org_name
-        description: Organisation name. Present when contact represents a business.
       - name: org_key
-        description: Organisation key.
+        description: Organization identifier (up to 30 chars in source). Composite PK with contact_type_id.
+        tests: [not_null]
+      - name: contact_type_id
+        description: Contact type from the source enum (TRANSACTION_ENU_CONTACTTYPE). Composite PK with org_key.
+      - name: org_name
+        description: Organisation name, normalized to uppercase with leading spaces stripped.
+      - name: name_title
+        description: Title / salutation.
       - name: first_name
-        description: Contact first name.
+        description: Contact first name, normalized to initcap (first letter upper, rest lower).
+      - name: middle_name
+        description: Contact middle name.
       - name: last_name
-        description: Contact primary last name.
+        description: Contact last name, normalized to initcap.
+      - name: last_name_2
+        description: Secondary last name.
+      - name: name_suffix
+        description: Name suffix.
+      - name: nickname
+        description: Nickname.
       - name: email
         description: Email address.
       - name: phone_business
         description: Business phone number.
       - name: phone_mobile
         description: Mobile phone number.
+      - name: phone_fax
+        description: Fax number.
       - name: address_line_1
         description: Primary address line.
+      - name: address_line_2
+        description: Secondary address line, normalized — STE → SUITE, special chars removed, whitespace collapsed.
+      - name: address_line_3
+        description: Tertiary address line.
       - name: city
-        description: City.
+        description: City, normalized to uppercase with leading spaces stripped.
       - name: state
-        description: State or province code.
+        description: State / province code, normalized to uppercase with leading spaces stripped.
       - name: postal_code
-        description: Postal or ZIP code.
+        description: Postal / ZIP code.
       - name: country_code
-        description: Country code (text, not FK).
+        description: ISO 3166-1 alpha-2 country code (text lookup, not numeric FK).
       - name: latitude
         description: Geographic latitude.
       - name: longitude
         description: Geographic longitude.
+      - name: locale_code
+        description: Locale / language code.
+      - name: website
+        description: Website URL.
       - name: created_at
-        description: Record creation timestamp.
+        description: Record creation timestamp from source.
       - name: updated_at
-        description: Record last updated timestamp.
+        description: Record last updated timestamp from source.
       - name: ingested_at
         description: Fivetran sync timestamp.

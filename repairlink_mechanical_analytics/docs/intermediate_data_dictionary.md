@@ -19,21 +19,25 @@ All intermediate models are materialized as **`table`** (full refresh on every r
 ### Architecture flow
 
 ```
-STAGING                                 INTERMEDIATE                            MARTS
-────────                                ────────────                            ─────
-stg_repairlink__dealertrial         ┐
-stg_repairlink__dealeroemenrollment ├── int_repairlink__dealer ──────────► dim_dealer
-stg_repairlink__dealer_mapper       ┘
+STAGING                                 INTERMEDIATE                                   FINAL
+────────                                ────────────                                   ─────
+stg_repairlink__dealertrial         ┐                                                ► dim_dealer_trial
+stg_repairlink__dealer_mapper       ├── int_repairlink__dealer ───────────────────► dim_dealer
+stg_repairlink__dealeroemenrollment ┤   (dealer universe = union, 11-char canonical)
+int_repairlink__contact (enrich) ───┘                                                ► bridge_dealer_oem
+                                                                                       ► bridge_dealer_distance
+                                                                                       ► dim_oem
 
-stg_repairlink__shopconfig          ─── int_repairlink__shop ────────────► dim_shop
-
-stg_repairlink__manufacturer        ─── int_repairlink__manufacturer ────► dim_manufacturer
-stg_repairlink__countrymaster       ─── int_repairlink__country ─────────► dim_country
-stg_repairlink__currencymaster      ─── int_repairlink__currency ────────► dim_currency
-
-stg_repairlink__vehicle             ─── int_repairlink__vehicle (dedup by VIN) ──► dim_vehicle
-stg_repairlink__contact             ─── int_repairlink__contact (filtered) ─────► dim_contact
+stg_repairlink__shopconfig          ─── int_repairlink__shop ───────────────────────► dim_shop
+stg_repairlink__manufacturer        ─── int_repairlink__manufacturer ───────────────► dim_manufacturer
+stg_repairlink__countrymaster       ─── int_repairlink__country ────────────────────► dim_country
+stg_repairlink__currencymaster      ─── int_repairlink__currency ───────────────────► dim_currency
+stg_repairlink__vehicle             ─── int_repairlink__vehicle (dedup by VIN) ─────► dim_vehicle
+stg_repairlink__contact             ─── int_repairlink__contact (enrichment, NOT a dim)
+                                        one row per (org_key, contact_type_id)
 ```
+
+**Note on the contact model:** `int_repairlink__contact` is now treated as an **organizational enrichment layer**, not a transactional one. It feeds enrichment into `dim_dealer` (and any other entity dim that needs org context) via `org_key`. There is no `dim_contact` — the original idea of "contact as a dimension" was abandoned once we realized the org_key universe spans dealers, shops, manufacturers, suppliers etc., and identity resolution would need a separate effort.
 
 ---
 
