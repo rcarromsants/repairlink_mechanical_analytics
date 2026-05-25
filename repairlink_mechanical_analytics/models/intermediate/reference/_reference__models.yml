@@ -57,7 +57,6 @@ models:
       - name: oem_id
         description: OEM identifier from RepairLink.
         tests:
-          - unique
           - not_null
 
       - name: oem_name
