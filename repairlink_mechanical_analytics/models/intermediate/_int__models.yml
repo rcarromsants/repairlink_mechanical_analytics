@@ -63,7 +63,7 @@ models:
         description: Record creation timestamp.
       - name: updated_at
         description: Record last updated timestamp.
-            - name: contact_type_id
+      - name: contact_type_id
         description: Contact type identifier associated with the shop contact.
       - name: contact_type_name
         description: System contact type name/key.
