@@ -1,5 +1,5 @@
-
 name: 'repairlink_mechanical_analytics'
+config-version: 2
 version: '1.0.0'
 
 profile: 'repairlink_mechanical_analytics'
