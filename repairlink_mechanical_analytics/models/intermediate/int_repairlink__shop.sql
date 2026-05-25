@@ -62,7 +62,7 @@ final as (
     from source s
 
     left join contacts c
-        on s.shop_id = c.org_key
+        on s.shop_id = left(c.org_key, 11)
 
     left join contact_types ct
         on c.contact_type_id = ct.contact_type_id
