@@ -20,9 +20,15 @@ models:
     staging:
       +materialized: incremental
       +schema: staging
+
     intermediate:
       +materialized: table
       +schema: intermediate
+
+      reference:
+        +schema: reference
+        +materialized: table
+
     final:
       +materialized: table
       +schema: final
