@@ -53,7 +53,7 @@ sources:
         description: >
           Contact entities associated with transactions. Base entity for dim_contact.
       
-      - name: TRANSACTION_ENT_CONTACTTYPE
+      - name: TRANSACTION_ENU_CONTACTTYPE
         description: >
           Contact type lookup for transaction contacts. Used to enrich dim_contact with contact role information.
 
