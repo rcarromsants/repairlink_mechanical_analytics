@@ -47,3 +47,35 @@ models:
 
       - name: ingested_at
         description: Timestamp when the record was ingested.
+
+
+  - name: ref_repairlink__oem
+    description: >
+      OEM reference lookup table sourced from dealer OEM enrollment data.
+
+    columns:
+      - name: oem_id
+        description: OEM identifier from RepairLink.
+        tests:
+          - unique
+          - not_null
+
+      - name: oem_name
+        description: OEM display name.
+
+  - name: ref_repairlink__contact_type
+    description: >
+      Reference lookup table for RepairLink contact types.
+
+    columns:
+      - name: contact_type_id
+        description: Contact type identifier.
+        tests:
+          - unique
+          - not_null
+
+      - name: contact_type_name
+        description: System contact type name/key.
+
+      - name: contact_type_remark
+        description: Human-readable contact type description.

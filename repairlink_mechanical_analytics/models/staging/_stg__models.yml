@@ -366,3 +366,19 @@ models:
         description: Record last updated timestamp.
       - name: ingested_at
         description: Fivetran sync timestamp used for incremental processing.
+      - name: stg_repairlink__transaction_enu_contacttype
+    description: >
+      Staging model for RepairLink contact type enumeration values.
+
+    columns:
+      - name: contact_type_id
+        description: Contact type identifier from RepairLink.
+        tests:
+          - unique
+          - not_null
+
+      - name: contact_type_name
+        description: System contact type key.
+
+      - name: contact_type_remark
+        description: Human-readable contact type description.
