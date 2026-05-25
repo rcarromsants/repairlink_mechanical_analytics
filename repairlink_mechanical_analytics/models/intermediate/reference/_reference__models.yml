@@ -1,0 +1,49 @@
+version: 2
+
+models:
+
+  - name: ref_repairlink__country
+    description: >
+      Reference table containing RepairLink country lookup data
+      used by intermediate and downstream models.
+
+    columns:
+      - name: country_id
+        description: Source country identifier.
+        tests:
+          - unique
+          - not_null
+
+      - name: country_name
+        description: Country name.
+
+      - name: two_letter_iso_code
+        description: ISO 3166-1 alpha-2 country code.
+
+      - name: three_letter_iso_code
+        description: ISO 3166-1 alpha-3 country code.
+
+      - name: ingested_at
+        description: Timestamp when the record was ingested.
+
+
+  - name: ref_repairlink__currency
+    description: >
+      Reference table containing RepairLink currency lookup data
+      used by intermediate and downstream models.
+
+    columns:
+      - name: currency_id
+        description: Source currency identifier.
+        tests:
+          - unique
+          - not_null
+
+      - name: currency_code
+        description: Currency ISO code.
+
+      - name: currency_name
+        description: Currency display name.
+
+      - name: ingested_at
+        description: Timestamp when the record was ingested.

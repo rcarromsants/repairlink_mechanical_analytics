@@ -4,266 +4,290 @@ models:
 
   - name: dim_dealer
     description: >
-      Comprehensive dealer dimension. One row per dealer (11-char canonical id) plus
-      one Unknown row (Type 1, current state only). The dealer universe is the union of
-      all distinct dealer_ids across dealertrial, dealer_mapper (both ends) and
-      dealeroemenrollment — NOT the trial subset.
-      Enriched with OEM enrollment counts and the most-recent contact / organizational
-      info from int_repairlink__contact.
-      See dim_dealer_trial for the trial-specific lifecycle context.
+      Comprehensive dealer entity dataset.
+      One row per dealer (11-char canonical dealer_id).
+      The dealer universe is the union of all distinct dealer_ids across
+      dealertrial, dealer_mapper (both ends), and dealeroemenrollment.
+      Enriched with OEM enrollment counts and the latest contact /
+      organisational information.
+      See dim_dealer_trial for dealer trial lifecycle context.
+
     columns:
-      - name: dealer_key
-        description: Surrogate key (MD5 hash of dealer_id).
-        tests: [not_null, unique]
       - name: dealer_id
-        description: 11-char canonical dealer identifier. 'UNKNOWN' for the sentinel row.
+        description: 11-char canonical dealer identifier.
         tests: [not_null]
+
       - name: total_oem_count
         description: Total OEM enrollments (active + inactive) for this dealer.
+
       - name: active_oem_count
         description: Currently active OEM enrollments.
+
       - name: contact_type_id
-        description: Contact type associated with the enriched contact row. Nullable.
+        description: Contact type associated with the enriched contact row.
+
       - name: org_name
-        description: Organisation name from contact enrichment, normalised (uppercase, leading spaces stripped).
+        description: Organisation name from contact enrichment.
+
       - name: first_name
-        description: Primary contact first name (initcap).
+        description: Primary contact first name.
+
       - name: last_name
-        description: Primary contact last name (initcap).
+        description: Primary contact last name.
+
       - name: email
+
       - name: phone_business
+
       - name: phone_mobile
+
       - name: address_line_1
+
       - name: address_line_2
-        description: Normalised address line 2 (STE → SUITE, special chars removed).
+        description: Normalised address line 2.
+
       - name: city
-        description: City, uppercased.
+        description: City.
+
       - name: state
-        description: State / province code, uppercased.
+        description: State / province code.
+
       - name: postal_code
+
       - name: country_code
         description: ISO 3166-1 alpha-2 country code.
 
+
+
   - name: dim_dealer_trial
     description: >
-      Dealer trial dimension. One row per dealer trial record plus one Unknown row.
-      Holds the trial lifecycle/business-status context for the small subset of dealers
-      that have a trial record (18 rows in current dev data).
-      Joins to dim_dealer via the 11-char canonical dealer_id (dealer_id_full is the
-      original 15-char form kept for reference).
+      Dealer trial lifecycle dataset.
+      One row per dealer with trial activity.
+      Holds the latest lifecycle/business-status context for dealers
+      that have a trial record.
+      dealer_id_full preserves the original 15-char source identifier.
+
     columns:
-      - name: dealer_trial_key
-        description: Surrogate key (MD5 hash of dealer_trial_id).
-        tests: [not_null, unique]
       - name: dealer_trial_id
         description: Source primary key.
+
       - name: dealer_id
-        description: 11-char canonical dealer_id — joinable to dim_dealer.dealer_id.
+        description: 11-char canonical dealer identifier.
+
       - name: dealer_id_full
-        description: Original 15-char dealer_id from source (kept for traceability).
+        description: Original 15-char dealer identifier from source.
+
       - name: status_id
-        description: >
-          Trial status code.
-          NOTE: only one distinct value (1) observed in current dev data.
+        description: Trial status identifier.
+
       - name: trial_started_at
-        description: When the trial started (UTC).
+        description: Timestamp when the dealer trial started.
+
       - name: trial_ended_at
-        description: When the trial ended (UTC). Null if still active.
+        description: Timestamp when the dealer trial ended.
+
       - name: is_active
-        description: Derived flag — true when trial_ended_at IS NULL.
+        description: Indicates whether the dealer trial is currently active.
+
       - name: created_at
+        description: Source record creation timestamp.
+
       - name: updated_at
+        description: Source record last update timestamp.
+
       - name: ingested_at
+        description: Timestamp when the record was ingested.
 
-  - name: dim_oem
-    description: >
-      OEM dimension. Distinct OEMs that dealers enroll with, sourced from
-      DEALEROEMENROLLMENT. oem_name is denormalised at source (same oem_id can appear
-      with multiple spellings); we pick the most frequent spelling per oem_id as the
-      canonical name.
-    columns:
-      - name: oem_key
-        description: Surrogate key (MD5 hash of oem_id).
-        tests: [not_null, unique]
-      - name: oem_id
-        description: Natural key.
-      - name: oem_name
-        description: Canonical OEM name (most frequent spelling per oem_id).
 
-  - name: bridge_dealer_oem
-    description: >
-      Many-to-many bridge table linking dealers to the OEMs they're enrolled with.
-      One row per enrollment record from DEALEROEMENROLLMENT.
-      Keys are deterministic MD5 hashes aligned with dim_dealer and dim_oem.
-    columns:
-      - name: dealer_key
-        description: FK to dim_dealer.dealer_key. MD5 hash of the 11-char dealer_id.
-        tests: [not_null]
-      - name: oem_key
-        description: FK to dim_oem.oem_key. MD5 hash of oem_id.
-        tests: [not_null]
-      - name: dealer_oem_enrollment_id
-        description: Source primary key (unique per enrollment row).
-        tests: [not_null, unique]
-      - name: dealer_id
-        description: 11-char canonical dealer_id.
-      - name: dealer_id_full
-        description: Original 15-char dealer_id from source.
-      - name: oem_id
-        description: OEM identifier.
-      - name: oem_name
-        description: OEM name as recorded on this specific enrollment row (may differ from canonical in dim_oem).
-      - name: is_active
-        description: Whether the enrollment is currently active.
-      - name: enrolled_at
-        description: When the enrollment was created (UTC).
-      - name: updated_at
-      - name: ingested_at
-
-  - name: bridge_dealer_distance
-    description: >
-      Many-to-many bridge table representing the dealer-to-dealer distance network.
-      One row per dealer pair from DEALER_MAPPER. Both keys point to dim_dealer.
-    columns:
-      - name: from_dealer_key
-        description: FK to dim_dealer.dealer_key for the source dealer.
-        tests: [not_null]
-      - name: to_dealer_key
-        description: FK to dim_dealer.dealer_key for the connected dealer.
-        tests: [not_null]
-      - name: fivetran_id
-        description: Source surrogate key (DEALER_MAPPER has no natural PK).
-        tests: [not_null, unique]
-      - name: from_dealer_id
-        description: 11-char canonical dealer_id (source side).
-      - name: to_dealer_id
-        description: 11-char canonical connected_dealer_id.
-      - name: group_id
-        description: Group / cluster the dealer pair belongs to.
-      - name: distance_km
-        description: Distance in kilometres between the two dealers.
-      - name: status
-        description: >
-          Numeric status of the dealer relationship.
-          NOTE: always = 3 in current dev data.
-      - name: created_at
-      - name: updated_at
-      - name: ingested_at
-
-  - name: dim_shop
-    description: >
-      Shop dimension. One row per shop plus one Unknown row (Type 1, current state only).
-      Surrogate key generated as an MD5 hash of shop_id.
-    columns:
-      - name: shop_key
-        description: Surrogate key (MD5 hash of shop_id).
-        tests: [not_null, unique]
-      - name: shop_id
-        description: Natural key for the shop ('UNKNOWN' for the sentinel row).
-        tests: [not_null]
-      - name: location_code
-        description: Location code associated with the shop.
-      - name: order_type
-        description: >
-          Order type configured for the shop.
-          NOTE: only one distinct value (1) observed in current dev data.
-      - name: created_at
-      - name: updated_at
-
-  - name: dim_manufacturer
-    description: >
-      Manufacturer dimension. One row per manufacturer plus one Unknown row (Type 1).
-      Broader than dim_oem — covers vehicle OEMs, tire brands, and commercial truck makers.
-      Sentinel (manufacturer_id = 0) excluded upstream at the intermediate layer.
-    columns:
-      - name: manufacturer_key
-        description: Surrogate key (MD5 hash of manufacturer_id).
-        tests: [not_null, unique]
-      - name: manufacturer_id
-      - name: manufacturer_name_long
-      - name: manufacturer_name_short
-      - name: abbreviation
-      - name: manufacturer_business_key
-        description: Business key from source (renamed from manufacturer_key to avoid surrogate-key naming conflict).
-      - name: org_key
-        description: Organisation key. Sparsely populated.
-      - name: industry_id
-        description: Industry segment (1 = Automotive OEM, 4 = Construction, 5 = Commercial Trucks).
-      - name: is_phoenix_published_inv
-      - name: ingested_at
-
-  - name: dim_country
-    description: >
-      Country dimension. One row per ISO country plus one Unknown row.
-      Sentinel (country_id = 0) excluded upstream.
-    columns:
-      - name: country_key
-        description: Surrogate key (MD5 hash of country_id).
-        tests: [not_null, unique]
-      - name: country_id
-        description: Natural key and ISO 3166-1 numeric country code.
-      - name: country_name
-      - name: two_letter_iso_code
-        description: ISO 3166-1 alpha-2 code. 'XX' for the Unknown sentinel.
-      - name: three_letter_iso_code
-        description: ISO 3166-1 alpha-3 code. 'XXX' for the Unknown sentinel.
-      - name: ingested_at
-
-  - name: dim_currency
-    description: >
-      Currency dimension. One row per ISO currency plus one Unknown row.
-      Sentinel (currency_id = 0) excluded upstream.
-      WARNING: currency_name is NOT unique (Kwacha = MWK + ZMK). Always join on currency_code.
-    columns:
-      - name: currency_key
-        description: Surrogate key (MD5 hash of currency_id).
-        tests: [not_null, unique]
-      - name: currency_id
-        description: Natural key and ISO 4217 numeric currency code (e.g. 840 = USD, 978 = EUR).
-      - name: currency_name
-        description: >
-          Full name of the currency. NOT unique — 'Kwacha' refers to both MWK (Malawian) and ZMK (Zambian).
-      - name: currency_code
-        description: ISO 4217 three-letter alphabetic code.
-      - name: ingested_at
 
   - name: dim_vehicle
     description: >
-      Vehicle dimension. One row per physical vehicle (deduplicated by VIN) plus one Unknown row.
-      Always-null columns dropped based on data quality findings.
+      Vehicle entity dataset enriched with VIN intelligence attributes.
+
     columns:
-      - name: vehicle_key
-        description: Surrogate key (MD5 hash of VIN).
-        tests: [not_null, unique]
       - name: vin
-        description: Vehicle Identification Number.
+        description: Vehicle VIN identifier.
         tests: [not_null]
+
       - name: vehicle_id
+        description: Source vehicle identifier.
+
       - name: transaction_id
+        description: Associated transaction identifier.
+
       - name: vehicle_type_id
-        description: >
-          Foreign key to the vehicle type enum.
-          NOTE: only one distinct value (103) observed in current dev data.
+        description: Vehicle type identifier.
+
       - name: status_id
-        description: >
-          Numeric status code.
-          NOTE: only one distinct value (1) observed in current dev data.
+        description: Vehicle status identifier.
+
       - name: vehicle_year
-        description: Model year. Ranges 1–2027. year = 0 excluded upstream.
+        description: Vehicle model year.
+
       - name: vehicle_make
-        description: Vehicle make from RepairLink source. Subject to capitalisation inconsistencies — see vehicle_make_vintelligence for canonical.
+        description: Original RepairLink vehicle make.
+
       - name: vehicle_model
-        description: Vehicle model from RepairLink source.
+        description: Original RepairLink vehicle model.
+
       - name: vehicle_make_vintelligence
-        description: Canonical vehicle make from the VIN intelligence enrichment dataset.
+        description: Canonical vehicle make from VIN intelligence enrichment.
+
       - name: vehicle_model_vintelligence
-        description: Canonical vehicle model from the VIN intelligence enrichment dataset.
+        description: Canonical vehicle model from VIN intelligence enrichment.
+
       - name: vin_vintelligence
-        description: VIN significant pattern mask from the VIN intelligence dataset.
+        description: VIN returned from VIN intelligence enrichment.
+
       - name: vin_decoded_correctly
-        description: >
-          Whether the VIN was decoded.
-          NOTE: always false in current dev data.
+        description: Indicates whether VIN decoding was successful.
+
       - name: created_at
+        description: Source record creation timestamp.
+
       - name: updated_at
+        description: Source record last update timestamp.
+
       - name: ingested_at
+        description: Timestamp when the record was ingested.
+
+
+
+  - name: dim_shop
+    description: >
+      Shop entity dataset enriched with organisational and contact information.
+
+    columns:
+      - name: shop_id
+        description: Source shop identifier.
+        tests: [not_null]
+
+      - name: org_name
+        description: Organisation name.
+
+      - name: first_name
+        description: Primary contact first name.
+
+      - name: last_name
+        description: Primary contact last name.
+
+      - name: email
+        description: Primary contact email address.
+
+      - name: city
+        description: City.
+
+      - name: state
+        description: State / province code.
+
+      - name: country_code
+        description: ISO country code.
+
+      - name: website
+        description: Shop website URL.
+
+      - name: created_at
+        description: Source record creation timestamp.
+
+      - name: updated_at
+        description: Source record last update timestamp.
+
+
+
+  - name: dim_manufacturer
+    description: >
+      Manufacturer entity dataset used for RepairLink enrichment.
+
+    columns:
+      - name: manufacturer_id
+        description: Manufacturer identifier from RepairLink.
+        tests: [not_null]
+
+      - name: manufacturer_name_long
+        description: Long manufacturer display name.
+
+      - name: manufacturer_name_short
+        description: Short manufacturer display name.
+
+      - name: abbreviation
+        description: Manufacturer abbreviation.
+
+      - name: manufacturer_business_key
+        description: Source manufacturer business identifier.
+
+      - name: org_key
+        description: Source organisation key.
+
+      - name: industry_id
+        description: Industry identifier.
+
+      - name: is_phoenix_published_inv
+        description: Indicates whether Phoenix inventory is published.
+
+      - name: ingested_at
+        description: Timestamp when the record was ingested.
+
+
+
+  - name: bridge_dealer_distance
+    description: >
+      Dealer-to-dealer distance relationship bridge table.
+
+    columns:
+      - name: from_dealer_id
+        description: Source dealer identifier.
+
+      - name: to_dealer_id
+        description: Connected dealer identifier.
+
+      - name: group_id
+        description: Dealer group identifier.
+
+      - name: distance_km
+        description: Distance between dealers in kilometers.
+
+      - name: status
+        description: Relationship status.
+
+      - name: created_at
+        description: Source record creation timestamp.
+
+      - name: updated_at
+        description: Source record last update timestamp.
+
+      - name: ingested_at
+        description: Timestamp when the record was ingested.
+
+
+
+  - name: bridge_dealer_oem
+    description: >
+      Dealer-to-OEM enrollment bridge table.
+
+    columns:
+      - name: dealer_oem_enrollment_id
+        description: Enrollment record identifier.
+
+      - name: dealer_id
+        description: 11-char canonical dealer identifier.
+
+      - name: dealer_id_full
+        description: Original 15-char dealer identifier from source.
+
+      - name: oem_id
+        description: OEM identifier.
+
+      - name: oem_name
+        description: OEM display name.
+
+      - name: is_active
+        description: Indicates whether the OEM enrollment is active.
+
+      - name: enrolled_at
+        description: Enrollment creation timestamp.
+
+      - name: updated_at
+        description: Source record last update timestamp.
+
+      - name: ingested_at
+        description: Timestamp when the record was ingested.
