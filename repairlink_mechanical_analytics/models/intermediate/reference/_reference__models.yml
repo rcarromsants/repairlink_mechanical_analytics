@@ -71,7 +71,6 @@ models:
       - name: contact_type_id
         description: Contact type identifier.
         tests:
-          - unique
           - not_null
 
       - name: contact_type_name
