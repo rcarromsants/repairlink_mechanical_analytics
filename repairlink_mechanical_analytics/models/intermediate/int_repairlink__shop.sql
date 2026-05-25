@@ -62,7 +62,7 @@ final as (
     from source s
 
     left join contacts c
-        on s.org_key = c.org_key
+        on s.shop_id = c.org_key
 
     left join contact_types ct
         on c.contact_type_id = ct.contact_type_id
