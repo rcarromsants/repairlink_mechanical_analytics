@@ -3,7 +3,7 @@
 with source as (
 
     select *
-    from {{ ref('stg_repairlink__shop') }}
+    from {{ ref('stg_repairlink__shopconfig') }}
 
 ),
 
