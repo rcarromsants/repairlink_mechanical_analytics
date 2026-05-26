@@ -3,50 +3,50 @@ version: 2
 models:
 
   - name: ref_repairlink__country
-    description: >
-      Reference table containing RepairLink country lookup data
-      used by intermediate and downstream models.
-
+      One row per country. Passthrough from stg_repairlink__countrymaster
+      with the Unknown sentinel record (country_id = 0) excluded.
+      239 active countries. Ready for dim_country.
     columns:
       - name: country_id
-        description: Source country identifier.
-        tests:
-          - unique
-          - not_null
-
+        description: Primary key and ISO 3166-1 numeric country code.
+        tests: [not_null, unique]
       - name: country_name
-        description: Country name.
-
+        description: Full formal country name.
+        tests: [not_null]
       - name: two_letter_iso_code
-        description: ISO 3166-1 alpha-2 country code.
-
+        description: ISO 3166-1 alpha-2 code (e.g. US, GB).
+        tests: [not_null]
       - name: three_letter_iso_code
-        description: ISO 3166-1 alpha-3 country code.
-
+        description: ISO 3166-1 alpha-3 code (e.g. USA, GBR).
+        tests: [not_null]
       - name: ingested_at
-        description: Timestamp when the record was ingested.
+        description: Fivetran sync timestamp.
 
 
   - name: ref_repairlink__currency
     description: >
       Reference table containing RepairLink currency lookup data
       used by intermediate and downstream models.
+      One row per currency. Passthrough from stg_repairlink__currencymaster
+      with the Unknown sentinel record (currency_id = 0) excluded.
+      164 active currencies.
 
     columns:
       - name: currency_id
-        description: Source currency identifier.
-        tests:
-          - unique
-          - not_null
-
-      - name: currency_code
-        description: Currency ISO code.
-
+        description: Primary key and ISO 4217 numeric currency code (e.g. 840 = USD, 978 = EUR).
+        tests: [not_null, unique]
       - name: currency_name
-        description: Currency display name.
-
+        description: Full name of the currency.
+          NOTE currency_name is NOT unique — two distinct currencies share the name 'Kwacha'
+          (MWK = Malawian Kwacha, ZMK = Zambian Kwacha). This is a legitimate real-world overlap,
+          not a data quality issue. For joining and display, always use currency_code (ISO 4217
+          alpha-3) which IS unique, not currency_name.
+        tests: [not_null]
+      - name: currency_code
+        description: ISO 4217 three-letter alphabetic code (e.g. USD, EUR).
+        tests: [not_null]
       - name: ingested_at
-        description: Timestamp when the record was ingested.
+        description: Fivetran sync timestamp.
 
 
   - name: ref_repairlink__oem
