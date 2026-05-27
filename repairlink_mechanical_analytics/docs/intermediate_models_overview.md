@@ -4,18 +4,6 @@
 - Main logic: Filters out records with no meaningful identity information
 - Main usage: Contact, organization, and location analytics
 
-## int_repairlink__country
-- Business meaning: Country reference/master data
-- Grain: 1 row = 1 country
-- Main logic: Removes sentinel “Unknown” record (`country_id = 0`)
-- Main usage: Geographic standardization and reporting
-
-## int_repairlink__currency
-- Business meaning: Currency reference/master data
-- Grain: 1 row = 1 currency
-- Main logic: Removes sentinel “Unknown” record (`currency_id = 0`)
-- Main usage: Financial and localization analytics
-
 ## int_repairlink__manufacturer
 - Business meaning: Vehicle manufacturer reference entity
 - Grain: 1 row = 1 manufacturer

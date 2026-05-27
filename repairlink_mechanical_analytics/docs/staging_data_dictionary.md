@@ -2,8 +2,9 @@
 
 **Jira epic:** [DAT-2215 — Identify DIM Tables](https://oeconnection.atlassian.net/browse/DAT-2215)
 **Source database / schema:** `RAW.REPAIRLINK_SQLSERVER_DBO`
-**Ingestion:** Fivetran from RepairLink SQL Server
-**Last data validation:** 2026-05-06
+**Ingestion:** Fivetran from RepairLink SQL Server 
+!! (except for `transaction_enu_contact`, for no particular reason — we agreed to review whether it would make sense to keep this incremental method in the future or if we could switch to a view without this parameter) !!
+**Last data validation:** 2026-05-26
 
 ---
 
@@ -11,7 +12,7 @@
 
 This document describes every source table currently staged in the `repairlink_mechanical_analytics` dbt project, why it was added, what's in it, and how it flows downstream into the dimensional model.
 
-The goal of the epic is to identify and model the relevant dim tables → shops, dealers, users, locations, and related entities. Every staging model below was selected from the **130 tables** in `RAW.REPAIRLINK_SQLSERVER_DBO` based on:
+The goal of the epic is to identify and model the relevant dim tables → shops, dealers, users, locations, and related entities. Every staging model below was selected from the **133 tables** in `RAW.REPAIRLINK_SQLSERVER_DBO` based on:
 
 1. Whether it represents a **business entity** worth dimensioning, or
 2. Whether it provides **enrichment data** for an existing dimension, or
@@ -19,308 +20,201 @@ The goal of the epic is to identify and model the relevant dim tables → shops,
 
 Tables that are operational, audit, log, or cross-reference (`*_AUD_*`, `*_HST_*`, `*_LOG_*`, `*_XRF_*`, `INTEGRATION_OUTBOX_*`, etc.) were intentionally excluded — they don't add analytical value at the dim layer.
 
-### Architecture flow
 
-```
-STAGING (incremental (for now) - should be review for view, rename/cast)
-        │
-        ├── stg_repairlink__dealertrial ───────────┐
-        │   stg_repairlink__dealeroemenrollment ───►  int_repairlink__dealer ──► dim_dealer
-        │   stg_repairlink__dealer_mapper ─────────┘
-        │
-        ├── stg_repairlink__shopconfig ────────────►  int_repairlink__shop ───► dim_shop
-        │   stg_repairlink__shopusermapper                (passthrough — kept staging-only)
-        │
-        ├── stg_repairlink__manufacturer ──────────►  int_repairlink__manufacturer ──► dim_manufacturer
-        ├── stg_repairlink__countrymaster ─────────►  int_repairlink__country ─────► dim_country
-        ├── stg_repairlink__currencymaster ────────►  int_repairlink__currency ────► dim_currency
-        │
-        ├── stg_repairlink__vehicle ───────────────►  int_repairlink__vehicle (dedup by VIN) ──► dim_vehicle
-        ├── stg_repairlink__contact ───────────────►  int_repairlink__contact (filtered) ─────► dim_contact
-        │
-        └── stg_repairlink__suppliermapper                (staging-only — no dim yet)
-```
+Current Staging Models
 
----
+stg_repairlink__contact	Transactional organizational contact source data
+stg_repairlink__dealertrial	Dealer lifecycle and trial records
+stg_repairlink__dealer_mapper	Dealer-to-dealer distance/proximity mappings
+stg_repairlink__dealeroemenrollment	Dealer OEM enrollment relationships
+stg_repairlink__shopconfig	Shop configuration and operational metadata
+stg_repairlink__manufacturer	Manufacturer source reference data
+stg_repairlink__countrymaster	Country source lookup data
+stg_repairlink__currencymaster	Currency source lookup data
+stg_repairlink__vehicle	Vehicle transaction entities
+stg_repairlink__transaction_enu_contacttype	Contact type enumeration lookup
+stg_repairlink__suppliermapper	Supplier mapping relationships
+stg_repairlink__shopusermapper	Shop/user mapping relationships
 
-## Tables intentionally excluded
+## Architecture Flow
+STAGING
+   │
+   ├── stg_repairlink__contact ───────────────► int_repairlink__contact
+   │
+   ├── stg_repairlink__dealertrial ──────────┐
+   ├── stg_repairlink__dealer_mapper ────────┼──► int_repairlink__dealer
+   ├── stg_repairlink__dealeroemenrollment ──┘
+   │
+   ├── stg_repairlink__shopconfig ───────────► int_repairlink__shop
+   ├── stg_repairlink__manufacturer ─────────► int_repairlink__manufacturer
+   ├── stg_repairlink__vehicle ──────────────► int_repairlink__vehicle
+   │
+   ├── stg_repairlink__countrymaster ────────► ref_repairlink__country
+   ├── stg_repairlink__currencymaster ───────► ref_repairlink__currency
+   │
+   ├── stg_repairlink__transaction_enu_contacttype
+   │                                              └──► ref_repairlink__contact_type
+   │
+   └── stg_repairlink__dealeroemenrollment ───► ref_repairlink__oem
 
-These were considered and dropped after data validation:
+## Model Catalogue
+### stg_repairlink__contact
+	
+Source table	TRANSACTION_ENT_CONTACT
+Grain	One row per transactional contact record
+Purpose	Organizational and contact source data used for enrichment
+Notes
 
-| Table | Reason for exclusion |
-|---|---|
-| `INTEGRATORMASTER` | Only **1 row** — not enough data to warrant a dim |
-| `FEATURES` | Only **1 row** — placeholder for future feature flags |
-| `FEATURESOVERRIDE` | Only **1 row** — depends on FEATURES being populated |
+This model acts as the base source for organizational enrichment logic later implemented in:
 
-These can be added later if the source data fills in.
+int_repairlink__contact
+int_repairlink__dealer
+int_repairlink__shop
 
----
+The source includes dealer, shop, and potentially supplier/manufacturer-related contacts.
 
-## Staging model catalogue
+### stg_repairlink__dealertrial
+	
+Source table	DEALERTRIAL
+Grain	One row per dealer trial record
+Purpose	Dealer lifecycle and trial-status source data
+Notes
 
-### 1. `stg_repairlink__dealertrial`
+Used downstream by:
 
-| | |
-|---|---|
-| **Source table** | `DEALERTRIAL` |
-| **Why we added it** | Base source for `dim_dealer`. Tracks dealer lifecycle (trial start, end, status). |
-| **Row count** | 18 active records |
-| **Primary key** | `dealer_trial_id` (from source `DEALERTRIALID`) |
-| **Natural key** | `dealer_id` (15-char varchar) |
-| **Materialization** | `incremental` on `_fivetran_synced` |
-| **Downstream** | `int_repairlink__dealer` → `dim_dealer` |
+int_repairlink__dealer
+dim_dealer_trial
 
-**Important columns:**
-- `dealer_trial_id` (PK)
-- `dealer_id` — natural key, joins to dealer enrollment + mapper
-- `status_id` — currently `1` for all rows (single value observed)
-- `trial_started_at` / `trial_ended_at` — UTC timestamps; null `trial_ended_at` = active dealer
+Dealer IDs in this source use the longer source-system identifier format and are normalized downstream to the canonical 11-character dealer ID where needed.
 
-**Data notes:**
-- Very small dataset (18 records) — likely demo/sandbox or early-stage account
-- `is_active` flag derived in `dim_dealer` from `trial_ended_at IS NULL`
+### stg_repairlink__dealer_mapper
+	
+Source table	DEALER_MAPPER
+Grain	One row per dealer relationship pair
+Purpose	Dealer-to-dealer distance/proximity mappings
+Notes
 
----
+Used downstream by:
 
-### 2. `stg_repairlink__shopconfig`
+int_repairlink__dealer
+bridge_dealer_distance
 
-| | |
-|---|---|
-| **Source table** | `SHOPCONFIG` |
-| **Why we added it** | Base source for `dim_shop`. Holds shop configuration (location, order type). |
-| **Row count** | 15 active records |
-| **Primary key** | `shop_config_id` (from source `ID`) |
-| **Natural key** | `shop_id` (15-char varchar) |
-| **Materialization** | `incremental` |
-| **Downstream** | `int_repairlink__shop` → `dim_shop` |
+This dataset represents a many-to-many dealer relationship network.
 
-**Important columns:**
-- `shop_config_id` (PK)
-- `shop_id` — natural key for the shop
-- `location_code` — geographic identifier
-- `order_type` — currently `1` for all rows (single value observed)
+### stg_repairlink__dealeroemenrollment
+	
+Source table	DEALEROEMENROLLMENT
+Grain	One row per dealer OEM enrollment
+Purpose	Dealer OEM relationship source data
+Notes
 
----
+Used downstream by:
 
-### 3. `stg_repairlink__shopusermapper`
+int_repairlink__dealer
+ref_repairlink__oem
+bridge_dealer_oem
 
-| | |
-|---|---|
-| **Source table** | `SHOPUSERMAPPER` |
-| **Why we added it** | Maps Snowflake users to external shop user IDs. Useful for joining users to shops. |
-| **Row count** | 45 active records |
-| **Primary key** | `shop_user_mapper_id` (from source `ID`) |
-| **Materialization** | `incremental` |
-| **Downstream** | Staging-only (no dim — this is a bridge/mapping table) |
+This source is also used to derive OEM normalization logic.
 
-**Important columns:**
-- `shop_user_mapper_id` (PK)
-- `user_id` — internal user identifier
-- `external_id` — external system's user ID
+### stg_repairlink__shopconfig
+	
+Source table	SHOPCONFIG
+Grain	One row per shop
+Purpose	Shop operational configuration data
+Notes
 
----
+Used downstream by:
 
-### 4. `stg_repairlink__dealer_mapper`
+int_repairlink__shop
+dim_shop
 
-| | |
-|---|---|
-| **Source table** | `DEALER_MAPPER` |
-| **Why we added it** | Captures the dealer-to-dealer distance/connection network. Used to enrich `dim_dealer` with `connected_dealer_count`. |
-| **Row count** | 2,999 active records |
-| **Primary key** | `fivetran_id` (surrogate; source has no natural PK) |
-| **Materialization** | `incremental` |
-| **Downstream** | `int_repairlink__dealer` (aggregated) |
+Shop identifiers use the canonical 11-character business identifier format.
 
-**Important columns:**
-- `fivetran_id` (PK) — surrogate, source has no natural key
-- `dealer_id` + `connected_dealer_id` — the directed pair
-- `distance_km` — integer (NUMBER(18,0))
-- `group_id` — clustering identifier
-- `status` — currently `3` for all rows (enum meaning not documented)
+### stg_repairlink__manufacturer
+	
+Source table	MASTER_ENT_MANUFACTURER
+Grain	One row per manufacturer
+Purpose	Manufacturer operational source dataset
+Notes
 
-**Data notes:**
-- Source table lacks a natural PK; we use `_fivetran_id` as surrogate
-- All records have `status = 3` — investigate enum if more values appear later
+Used downstream by:
 
----
+int_repairlink__manufacturer
+dim_manufacturer
 
-### 5. `stg_repairlink__suppliermapper`
+Contains operational manufacturer metadata and enrichment attributes.
 
-| | |
-|---|---|
-| **Source table** | `SUPPLIERMAPPER` |
-| **Why we added it** | Maps seller organisation keys (`001-XXX-XXX` format) to supplier numbers. Useful for supplier-side analysis. |
-| **Row count** | 111 active records |
-| **Primary key** | `supplier_mapper_id` (from source `ID`) |
-| **Materialization** | `incremental` |
-| **Downstream** | Staging-only (no dim yet) |
+### stg_repairlink__countrymaster
+	
+Source table	COUNTRYMASTER
+Grain	One row per country
+Purpose	Country lookup source data
+Notes
 
-**Important columns:**
-- `supplier_mapper_id` (PK)
-- `seller_org_key` — format `001-XXX-XXX`
-- `supplier_number` — integer; **NOT unique** (multiple seller_org_keys can map to the same supplier)
+Used downstream by:
 
-**Data notes:**
-- `supplier_number` is non-unique (e.g. `24499` appears for IDs 16 and 17; `23282` for IDs 36–39)
-- Source table has no audit columns (no `created_by`, `created_at`, etc.)
+ref_repairlink__country
 
----
+Contains ISO country reference information.
 
-### 6. `stg_repairlink__dealeroemenrollment`
+### stg_repairlink__currencymaster
+	
+Source table	CURRENCYMASTER
+Grain	One row per currency
+Purpose	Currency lookup source data
+Notes
 
-| | |
-|---|---|
-| **Source table** | `DEALEROEMENROLLMENT` |
-| **Why we added it** | Tracks which OEMs each dealer is enrolled with. Enriches `dim_dealer` with OEM relationship counts. |
-| **Row count** | 8,481 active records |
-| **Primary key** | `dealer_oem_enrollment_id` (from source `ID`) |
-| **Materialization** | `incremental` |
-| **Downstream** | `int_repairlink__dealer` (aggregated) |
+Used downstream by:
 
-**Important columns:**
-- `dealer_oem_enrollment_id` (PK)
-- `dealer_id` — FK to dealer
-- `oem_id` — FK to manufacturer (maps to `manufacturer_id` in `stg_repairlink__manufacturer`)
-- `oem_name` — **denormalised**; same `oem_id` can have different name values
-- `is_active` — boolean enrollment status
-- `created_at` / `updated_at` — UTC timestamps
+ref_repairlink__currency
 
-**Data notes:**
-- `oem_name` denormalisation: `oem_id=1` appears as both `'Chrysler'` and `'DCX'`; `oem_id=3` as `'General Motors'` and `'GM'`
-- Top OEMs by enrollment count: GM (1,590), Ford (1,424), Chrysler (1,023)
-- Use `stg_repairlink__manufacturer` for canonical OEM names — don't rely on `oem_name` here
+Contains ISO currency reference information.
 
----
+### stg_repairlink__vehicle
+	
+Source table	TRANSACTION_ENT_VEHICLE
+Grain	One row per transactional vehicle entity
+Purpose	Vehicle transaction source data
+Notes
 
-### 7. `stg_repairlink__manufacturer`
+Used downstream by:
 
-| | |
-|---|---|
-| **Source table** | `MASTER_ENT_MANUFACTURER` |
-| **Why we added it** | Reference table of manufacturers (vehicle OEMs, tire brands, commercial trucks). Base for `dim_manufacturer`. |
-| **Row count** | 78 active records |
-| **Primary key** | `manufacturer_id` (from source `MANUFACTURERID`) |
-| **Business key** | `manufacturer_key` |
-| **Materialization** | `incremental` |
-| **Downstream** | `int_repairlink__manufacturer` → `dim_manufacturer` |
+int_repairlink__vehicle
+dim_vehicle
 
-**Important columns:**
-- `manufacturer_id` (PK)
-- `manufacturer_name_long` — full name (e.g. 'Ford Motor Company')
-- `manufacturer_name_short` — short name (e.g. 'Ford')
-- `abbreviation` — e.g. 'GM', 'DCX'
-- `manufacturer_key` — unique business key (often same as abbreviation)
-- `industry_id` — `1` = Automotive OEM, `4` = Construction, `5` = Commercial Trucks
-- `org_key` — sparsely populated (only GM, Hyundai, etc.)
-- `is_phoenix_published_inv` — true for major OEMs publishing inventory in Phoenix
+This source contains VINs and vehicle metadata later enriched with VIN intelligence data.
 
-**Data notes:**
-- `manufacturer_id = 0 / 'Unknown'` is a sentinel record — excluded in intermediate
-- Mix of vehicle OEMs (Ford, GM, Toyota), tire brands (Michelin, Goodyear), and truck makers (Navistar, Daimler Truck)
+### stg_repairlink__transaction_enu_contacttype
+	
+Source table	TRANSACTION_ENU_CONTACTTYPE
+Grain	One row per contact type
+Purpose	Contact type enumeration lookup
+Notes
 
----
+Used downstream by:
 
-### 8. `stg_repairlink__countrymaster`
+ref_repairlink__contact_type
+int_repairlink__shop
 
-| | |
-|---|---|
-| **Source table** | `COUNTRYMASTER` |
-| **Why we added it** | ISO country reference. Base for `dim_country`. Used to decode country IDs across other tables. |
-| **Row count** | 240 active records |
-| **Primary key** | `country_id` (from source `COUNTRYID`; this **is** the ISO 3166-1 numeric code) |
-| **Materialization** | `incremental` |
-| **Downstream** | `int_repairlink__country` → `dim_country` |
+Provides reusable contact type semantics and descriptions.
 
-**Important columns:**
-- `country_id` (PK / ISO numeric code, e.g. `840` = USA, `826` = GBR)
-- `country_name` — full formal name (e.g. `'Albania, People's Socialist Republic of'`)
-- `two_letter_iso_code` — ISO 3166-1 alpha-2 (e.g. `US`, `GB`)
-- `three_letter_iso_code` — ISO 3166-1 alpha-3 (e.g. `USA`, `GBR`)
+### stg_repairlink__suppliermapper
+	
+Source table	SUPPLIERMAPPER
+Grain	One row per supplier mapping
+Purpose	Supplier relationship mapping data
+Notes
 
-**Data notes:**
-- `country_id = 0 / 'Unknown'` is a sentinel — excluded in intermediate
-- Country names use formal designations and may include commas
+Currently staged for future supplier modeling and enrichment use cases.
 
----
+### stg_repairlink__shopusermapper
+	
+Source table	SHOPUSERMAPPER
+Grain	One row per shop/user relationship
+Purpose	Shop-to-user relationship mapping
+Notes
 
-### 9. `stg_repairlink__currencymaster`
-
-| | |
-|---|---|
-| **Source table** | `CURRENCYMASTER` |
-| **Why we added it** | ISO currency reference. Base for `dim_currency`. |
-| **Row count** | 165 active records |
-| **Primary key** | `currency_id` (from source `CURRENCYID`; this **is** the ISO 4217 numeric code) |
-| **Materialization** | `incremental` |
-| **Downstream** | `int_repairlink__currency` → `dim_currency` |
-
-**Important columns:**
-- `currency_id` (PK / ISO numeric code, e.g. `840` = USD, `978` = EUR, `826` = GBP)
-- `currency_name` — full name (e.g. `'US Dollar'`)
-- `currency_code` — ISO 4217 alpha-3 (e.g. `USD`, `EUR`)
-
-**Data notes:**
-- `currency_id = 0 / 'Unknown'` is a sentinel — excluded in intermediate
-- Includes historical/deprecated currencies (e.g. `EEK` Estonian Kroon, `SKK` Slovak Koruna)
-
----
-
-### 10. `stg_repairlink__vehicle`
-
-| | |
-|---|---|
-| **Source table** | `TRANSACTION_ENT_VEHICLE` |
-| **Why we added it** | Vehicle entity per transaction. Base for `dim_vehicle` (deduplicated by VIN in intermediate). |
-| **Row count** | 5,617,883 active records |
-| **Primary key** | `vehicle_id` (from source `VEHICLEID`) |
-| **Materialization** | `incremental` |
-| **Downstream** | `int_repairlink__vehicle` (dedup by VIN) → `dim_vehicle` |
-
-**Important columns:**
-- `vehicle_id` (PK)
-- `transaction_id` / `document_id` — FKs (nullable; transactional in nature)
-- `vin` — VIN (~92% populated)
-- `vehicle_year` — model year (always populated; `0` = unknown sentinel; up to 2027 for new model years)
-- `vehicle_make` — brand (always populated, ~100%)
-- `vehicle_model` — model name (~96% populated)
-- `vehicle_type_id` — FK to vehicle type enum
-
-**Data notes:**
-- Transactional in nature — one row per transaction, NOT per physical vehicle
-- `odometer_reading`, all `plate_*` fields, `vin_decoded_correctly` are **always null/false** in current data
-- `vin_decoded_correctly` always false → no VIN decoding implemented yet
-- Intermediate model deduplicates by VIN to produce one row per physical vehicle
-
----
-
-### 11. `stg_repairlink__contact`
-
-| | |
-|---|---|
-| **Source table** | `TRANSACTION_ENT_CONTACT` |
-| **Why we added it** | Contact entity per transaction (buyer, seller, etc.). Base for `dim_contact`. |
-| **Row count** | 57,747,230 active records |
-| **Primary key** | `contact_id` (from source `CONTACTID`) |
-| **Materialization** | `incremental` |
-| **Downstream** | `int_repairlink__contact` (filtered) → `dim_contact` |
-
-**Important columns:**
-- `contact_id` (PK)
-- `transaction_id` / `document_id` — FKs (both nullable)
-- `contact_type_id` — FK to contact type enum (buyer, seller, etc.)
-- `org_name` / `org_key` — organisation if contact represents a business
-- Name fields split: `first_name`, `middle_name`, `last_name`, `last_name_2`, `name_suffix`, `nickname`, `name_title`
-- Address fields: `address_line_1/2/3`, `city`, `state`, `postal_code`, `country_code`
-- Geographic: `latitude`, `longitude`
-- Contact: `email`, `phone_business`, `phone_mobile`, `phone_fax`, `website`
-
-**Data notes:**
-- **Highest volume table** in the project (57.7M rows)
-- Transactional in nature — one row per transaction contact, not deduplicated by person
-- `status_id = 1` for **all** records (no variability observed)
-- `country_code` is text (e.g. `US`), not a FK to `country_id`
-- Intermediate model filters to records with at least a name or org_name
+Currently staged for future analytical or identity-resolution use cases.
 
 ---
 

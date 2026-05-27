@@ -17,19 +17,20 @@ deduped as (
     qualify row_number() over (
         partition by vin
         order by updated_at desc nulls last
-    ) = 1 -- Keep the most recently updated record for each VIN, in case of duplicates - confirm with business if this is the desired behavior when there are duplicates
+    ) = 1
+
 ),
 
--- VIN intelligence reference dataset from Automotive Dimensions repository.
--- Deduplicated on the join signature (first 8 chars + chars 10-11 of the VIN pattern mask)
--- so the LEFT JOIN below stays one-to-one and doesn't fan out.
+-- VIN intelligence reference dataset
 vin_intelligence as (
 
     select
         vin_signi_pattrn_mask,
         mak_nm,
         mdl_desc
+
     from {{ source('catalog_analytics', 'vintelligence_datafile') }}
+
     qualify row_number() over (
         partition by
             left(vin_signi_pattrn_mask, 8),
@@ -42,22 +43,37 @@ vin_intelligence as (
 enriched as (
 
     select
-        d.*,
+        d.vin,
+        d.vehicle_id,
+        d.transaction_id,
+        d.vehicle_type_id,
+        d.status_id,
+        d.vehicle_year,
+
+        -- Canonical make/model:
+        -- Prefer Automotive Dimensions enrichment;
+        -- fallback to normalized RepairLink values.
+
+        coalesce(
+            upper(ltrim(v.mak_nm)),
+            upper(ltrim(d.vehicle_make))
+        ) as vehicle_make,
+
+        coalesce(
+            upper(ltrim(v.mdl_desc)),
+            upper(ltrim(d.vehicle_model))
+        ) as vehicle_model,
 
         v.vin_signi_pattrn_mask as vin_vintelligence,
 
-        -- to be removed later-it doesn't add any value—it was just for testing
-        substring(trim(d.vin), 10, 2) as vin_suffix_vehicle, 
-        substring(v.vin_signi_pattrn_mask, 10, 2) as vin_suffix_vintelligence,
+        case
+            when v.mak_nm is not null then true
+            else false
+        end as vin_decoded_correctly,
 
-        -- Original RepairLink values 
-        -- Remove them once we have all the VIN records; there are many VINs with no matching records https://oeconnection.atlassian.net/browse/DAT-2341
-        -- d.vehicle_make 
-        --d.vehicle_model 
-        
-        -- New VIN intelligence values
-        v.mak_nm as vehicle_make_vintelligence,
-        v.mdl_desc as vehicle_model_vintelligence
+        d.created_at,
+        d.updated_at,
+        d.ingested_at
 
     from deduped d
 
@@ -68,16 +84,15 @@ enriched as (
 
 ),
 
--- Defensive final dedup: guarantee one row per VIN regardless of upstream join behaviour.
--- If the vin_intelligence-side dedup above is working, this is a no-op.
+-- Defensive final dedup
 final as (
 
     select *
     from enriched
+
     qualify row_number() over (
         partition by vin
-        order by case when vehicle_make_vintelligence is not null then 0 else 1 end,
-                 vehicle_make_vintelligence nulls last
+        order by case when vin_decoded_correctly then 0 else 1 end
     ) = 1
 
 )
