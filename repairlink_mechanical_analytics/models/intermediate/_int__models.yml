@@ -1,74 +1,140 @@
 version: 2
 
 models:
+
   - name: int_repairlink__dealer
     description: >
-      Comprehensive dealer entity. One row per dealer_id (11-char canonical form),
-      built from the union of every dealer-source table: stg_repairlink__dealertrial,
-      stg_repairlink__dealer_mapper (both ends), and stg_repairlink__dealeroemenrollment.
-      Enriched with OEM enrollment counts (active + total) and the most-recent contact
-      row per dealer from int_repairlink__contact. This is the universe-level dealer
-      view, NOT the trial subset — see dim_dealer_trial for lifecycle/trial context.
+      Canonical dealer entity model combining operational dealer datasets with dealer-related organizational contact activity.
+      Organizational contacts are also treated as evidence of dealer existence,
+      expanding dealer coverage beyond traditional operational sources.
+      This logic should be revisited with the business in the future to confirm whether contact-derived entities should permanently contribute to the canonical dealer universe.
     columns:
       - name: dealer_id
-        description: 11-char canonical dealer identifier. Stripped form aligned with dealer_mapper.dealer_id.
-        tests: [not_null, unique]
+        description: >
+          Canonical 11-character dealer identifier.
+        tests:
+          - not_null
+          - unique
+      - name: is_contact_observed
+        description: >
+          Indicates whether the dealer was identified through dealer-related organizational contacts (contact_type_id 101 or 104).
+      - name: is_operationally_observed
+        description: >
+          Indicates whether the dealer was identified through
+          operational dealer datasets such as dealertrial,
+          dealer_mapper, or dealeroemenrollment.
       - name: total_oem_count
-        description: Total count of distinct OEMs this dealer is enrolled with (active + inactive).
+        description: >
+          Total number of OEM enrollments associated with the dealer.
       - name: active_oem_count
-        description: Count of distinct currently-active OEM enrollments.
+        description: >
+          Number of currently active OEM enrollments associated with the dealer.
       - name: contact_type_id
-        description: Contact type associated with the enriched contact row (nullable when no matching contact).
+        description: >
+          Contact type identifier associated with the selected
+          dealer organizational enrichment record.
       - name: org_name
-        description: Organisation name from int_repairlink__contact enrichment. Nullable.
+        description: Dealer organization name.
       - name: first_name
-        description: Primary contact first name from int_contact enrichment.
+        description: Primary contact first name.
       - name: last_name
-        description: Primary contact last name from int_contact enrichment.
+        description: Primary contact last name.
       - name: email
-        description: Primary contact email from int_contact enrichment.
+        description: Primary contact email.
       - name: phone_business
-        description: Business phone from int_contact enrichment.
+        description: Business phone number.
       - name: phone_mobile
-        description: Mobile phone from int_contact enrichment.
+        description: Mobile phone number.
       - name: address_line_1
-        description: Address line 1 from int_contact enrichment.
+        description: Primary address line.
       - name: address_line_2
-        description: Address line 2 from int_contact enrichment (normalized).
+        description: Secondary address line.
       - name: city
-        description: City from int_contact enrichment (uppercased).
+        description: City name.
       - name: state
-        description: State / province code from int_contact enrichment (uppercased).
+        description: State or province code.
       - name: postal_code
-        description: Postal / ZIP code from int_contact enrichment.
+        description: Postal or ZIP code.
       - name: country_code
-        description: ISO 3166-1 alpha-2 country code from int_contact enrichment.
+        description: ISO alpha-2 country code.
 
   - name: int_repairlink__shop
     description: >
-      One row per shop, deduplicated to the most recent config record.
-      Clean shop entity ready for dimensional shaping in marts.
+      Canonical shop entity model combining operational shop configuration
+      data with shop-related organizational contact activity.
+      Organizational contacts are also treated as evidence of shop existence,
+      expanding shop coverage beyond operational configuration datasets.
+      This logic should be revisited with the business in the future to confirm whether contact-derived entities should permanently contribute to the canonical shop universe.
     columns:
       - name: shop_id
-        description: Natural key for the shop.
-        tests: [not_null]
-      - name: location_code
-        description: Location code associated with the shop.
-      - name: order_type
         description: >
-          Order type configured for the shop.
-          NOTE: only one distinct value (1) observed in current dev data.
-          Variability expected once running on live production data.
-      - name: created_at
-        description: Record creation timestamp.
-      - name: updated_at
-        description: Record last updated timestamp.
+          Canonical 11-character shop identifier.
+        tests:
+          - not_null
+          - unique
+      - name: location_code
+        description: Shop location code from SHOPCONFIG.
+      - name: order_type
+        description: Shop order type configuration.
+      - name: is_contact_observed
+        description: >
+          Indicates whether the shop was identified through
+          shop-related organizational contacts
+          (contact_type_id 100 or 103).
+      - name: is_operationally_observed
+        description: >
+          Indicates whether the shop was identified through
+          operational shop configuration datasets.
       - name: contact_type_id
-        description: Contact type identifier associated with the shop contact.
+        description: >
+          Contact type identifier associated with the selected
+          shop organizational enrichment record.
       - name: contact_type_name
-        description: System contact type name/key.
+        description: >
+          Contact type semantic name from the contact type reference dataset.
       - name: contact_type_remark
-        description: Human-readable contact type description.
+        description: >
+          Additional contact type semantic description.
+      - name: org_name
+        description: Shop organization name.
+      - name: first_name
+        description: Primary contact first name.
+      - name: last_name
+        description: Primary contact last name.
+      - name: email
+        description: Primary contact email.
+      - name: phone_business
+        description: Business phone number.
+      - name: phone_mobile
+        description: Mobile phone number.
+      - name: phone_fax
+        description: Fax number.
+      - name: address_line_1
+        description: Primary address line.
+      - name: address_line_2
+        description: Secondary address line.
+      - name: address_line_3
+        description: Tertiary address line.
+      - name: city
+        description: City name.
+      - name: state
+        description: State or province code.
+      - name: postal_code
+        description: Postal or ZIP code.
+      - name: country_code
+        description: ISO alpha-2 country code.
+      - name: latitude
+        description: Geographic latitude coordinate.
+      - name: longitude
+        description: Geographic longitude coordinate.
+      - name: locale_code
+        description: Locale/language code.
+      - name: website
+        description: Shop website URL.
+      - name: created_at
+        description: Source record creation timestamp.
+      - name: updated_at
+        description: Source record last update timestamp.
 
   - name: int_repairlink__manufacturer
     description: >
@@ -113,27 +179,21 @@ models:
         description: >
           Primary key from source (most recent transaction vehicle_id for this VIN).
         tests: [not_null, unique]
-
       - name: vin
         description: >
           Vehicle Identification Number. Null VINs excluded upstream.
         tests: [not_null, unique]
-
       - name: transaction_id
         description: >
           Foreign key to the most recent transaction this vehicle appeared in.
-
       - name: vehicle_type_id
         description: >
           Foreign key to the vehicle type enum (TRANSACTION_ENU_VEHICLETYPE).
-
       - name: status_id
         description: Vehicle status identifier.
-
       - name: vehicle_year
         description: >
           Vehicle model year. Future model years are valid.
-
       - name: vehicle_make
         description: >
           Canonical vehicle make value.
@@ -141,29 +201,23 @@ models:
           Falls back to normalized RepairLink source values when VIN enrichment
           is unavailable.
         tests: [not_null]
-
       - name: vehicle_model
         description: >
           Canonical vehicle model value.
           Preferentially sourced from Automotive Dimensions VIN intelligence.
           Falls back to normalized RepairLink source values when VIN enrichment
           is unavailable.
-
       - name: vin_vintelligence
         description: >
           VIN pattern mask from Automotive Dimensions used for VIN matching validation.
-
       - name: vin_decoded_correctly
         description: >
           Indicates whether the VIN successfully matched the Automotive Dimensions
           VIN intelligence dataset.
-
       - name: created_at
         description: Record creation timestamp.
-
       - name: updated_at
         description: Record last updated timestamp.
-
       - name: ingested_at
         description: Fivetran sync timestamp.
 

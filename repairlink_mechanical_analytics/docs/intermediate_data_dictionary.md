@@ -10,7 +10,7 @@
 
 The intermediate layer has three jobs:
 
-1. **Deduplicate** — turn transactional rows into one row per business entity (e.g. one row per VIN, one row per dealer)
+1. **Deduplicate** — turn transactional rows into one row per business entity (e.g. one row per VIN, one row per dealer) -- The intermediate layer is also responsible for resolving and identifying business entities across partially fragmented operational datasets.
 2. **Enrich** — pre-join related staging data so marts don't have to repeat the work (e.g. attach OEM enrollment counts to each dealer)
 3. **Filter** — exclude sentinel records and rows that fail basic data-quality checks (e.g. drop the `id=0 / 'Unknown'` rows; drop vehicles with no VIN)
 
@@ -39,14 +39,15 @@ stg_repairlink__contact                    ─► int_repairlink__contact
 
 stg_repairlink__dealertrial               ┐
 stg_repairlink__dealer_mapper             ├── int_repairlink__dealer
-stg_repairlink__dealeroemenrollment       ┘
+stg_repairlink__dealeroemenrollment       ┤
 int_repairlink__contact                   ┘
+(contact-driven dealer discovery)
 
 
 stg_repairlink__shopconfig                ┐
 int_repairlink__contact                   ├── int_repairlink__shop
 ref_repairlink__contact_type              ┘
-
+(contact-driven shop discovery)
 
 stg_repairlink__manufacturer              ─► int_repairlink__manufacturer
 
@@ -205,14 +206,20 @@ shop enrichment	shop_id = left(org_key, 11)
 
 #### int_repairlink__dealer
 	
-Sources	dealer trial, dealer mapper, OEM enrollment, contact enrichment
-Grain	One row per canonical 11-character dealer
-Business key	dealer_id
+Sources
+dealer trial, dealer mapper, OEM enrollment, organizational contacts
+
+Grain
+One row per canonical 11-character dealer
+
+Business key
+dealer_id
+
 Purpose
 
-Consolidated dealer business entity.
+Canonical dealer entity model combining operational dealer datasets with dealer-related organizational contact activity.
 
-Builds the broader dealer ecosystem across multiple RepairLink operational datasets.
+This model expands dealer coverage by treating organizational contacts as evidence of dealer existence, rather than using contacts only as downstream enrichment.
 
 Dealer universe logic
 
@@ -221,23 +228,36 @@ The dealer universe is built from:
 dealer trial records;
 dealer mapper relationships;
 connected dealer relationships;
-OEM enrollment records.
+OEM enrollment records;
+dealer-related organizational contacts (contact_type_id 101 and 104).
 
-Dealer identifiers are normalized to the canonical 11-character format.
+Dealer identifiers are normalized to the canonical 11-character format using:
 
-Enrichment logic
+left(org_key, 11)
+Contact-driven entity discovery
 
-Adds:
+Organizational contacts are now also used to identify dealer entities that may not yet exist in operational enrollment or lifecycle datasets.
 
-total OEM enrollment count;
-active OEM enrollment count;
-organizational contact enrichment.
+This enhancement improves:
 
-Contact enrichment comes from:
+dealer coverage;
+transactional alignment;
+operational completeness.
+Observability flags
 
-int_repairlink__contact
+The model exposes:
 
-using: left(org_key, 11) as the dealer identifier.
+is_contact_observed
+is_operationally_observed
+
+to support:
+
+entity coverage analysis;
+future business validation;
+rollback assessment if needed.
+Important note
+
+This logic should be revisited with the business in the future to confirm whether contact-derived entities should permanently contribute to the canonical dealer universe.
 
 
 
@@ -259,47 +279,57 @@ preserves operational manufacturer attributes.
 
 #### int_repairlink__shop
 	
-Sources	shop config, contact enrichment, contact type reference
-Grain	One row per shop/contact enrichment combination
-Business key	shop_id plus contact context
+Sources
+shop configuration, organizational contacts, contact type reference
+
+Grain
+One row per canonical shop
+
+Business key
+shop_id
+
 Purpose
 
-Shop business entity enriched with organizational contact metadata.
+Canonical shop entity model combining operational shop configuration data with shop-related organizational contact activity.
 
-Enrichment logic
+This model expands shop coverage by treating organizational contacts as evidence of shop existence.
 
-Joins:
+Shop universe logic
 
-int_repairlink__contact
-ref_repairlink__contact_type
+The shop universe is built from:
 
-using:
+operational shop configuration records;
+shop-related organizational contacts (contact_type_id 100 and 103).
 
-shop_id = left(org_key, 11)
+Shop identifiers are normalized using:
 
-This normalization is required because:
+left(org_key, 11)
+Contact enrichment
 
-shop_id uses the canonical 11-character identifier;
-org_key may contain the longer source-system format.
-Contact type enrichment
+The model enriches shops with:
 
-Adds:
+organizational metadata;
+address/contact information;
+contact type semantics.
 
-contact_type_name
-contact_type_remark
-
-from:
+Contact type semantics come from:
 
 ref_repairlink__contact_type
-Important note on grain
+Observability flags
 
-This model is not strictly one row per shop.
+The model exposes:
 
-A shop can appear multiple times when multiple contact types exist.
+is_contact_observed
+is_operationally_observed
 
-The true grain is:
+to support:
 
-shop + contact enrichment context
+entity coverage analysis;
+business validation;
+operational completeness tracking.
+Important note
+
+This logic should be revisited with the business in the future to confirm whether contact-derived entities should permanently contribute to the canonical shop universe.
 
 
 #### int_repairlink__vehicle
