@@ -20,7 +20,6 @@ normalized as (
     select
         org_key,
         contact_type_id,
-        contact_type_name,  --100 sold-to for shop, 101 sold-by for dealers
 
         -- Text normalization
         upper(trim(org_name))                                            as org_name,
