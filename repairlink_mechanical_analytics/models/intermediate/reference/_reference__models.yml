@@ -3,9 +3,10 @@ version: 2
 models:
 
   - name: ref_repairlink__country
-      One row per country. Passthrough from stg_repairlink__countrymaster
-      with the Unknown sentinel record (country_id = 0) excluded.
-      239 active countries. Ready for dim_country.
+      description: >
+        One row per country. Passthrough from stg_repairlink__countrymaster
+        with the Unknown sentinel record (country_id = 0) excluded.
+        239 active countries. Ready for dim_country.
     columns:
       - name: country_id
         description: Primary key and ISO 3166-1 numeric country code.
