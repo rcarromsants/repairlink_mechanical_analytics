@@ -8,13 +8,9 @@ select
     status_id,
     vehicle_year,
 
-    -- Original RepairLink values
     vehicle_make,
     vehicle_model,
 
-    -- Canonical values from VIN intelligence enrichment
-    vehicle_make_vintelligence,
-    vehicle_model_vintelligence,
     vin_vintelligence,
     vin_decoded_correctly,
 
