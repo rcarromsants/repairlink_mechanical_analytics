@@ -20,9 +20,10 @@ normalized as (
     select
         org_key,
         contact_type_id,
+        contact_type_name,  --100 sold-to for shop, 101 sold-by for dealers
 
         -- Text normalization
-        upper(ltrim(org_name))                                            as org_name,
+        upper(trim(org_name))                                            as org_name,
         name_title,
         initcap(first_name)                                               as first_name,
         middle_name,
@@ -44,8 +45,8 @@ normalized as (
                     'SUITE'
                 ), '[-\\.\\#]',''),'\\s+',' '))) as address_line_2,
         address_line_3,
-        upper(ltrim(city))                                                as city,
-        upper(ltrim(state))                                               as state,
+        upper(trim(ltrim(city)))                                                as city,
+        upper(trim(state))                                               as state,
         postal_code,
         country_code,
         latitude,
