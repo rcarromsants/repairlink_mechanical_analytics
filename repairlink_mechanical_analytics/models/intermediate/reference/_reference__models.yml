@@ -3,25 +3,23 @@ version: 2
 models:
 
   - name: ref_repairlink__country
-      description: >
-        One row per country. Passthrough from stg_repairlink__countrymaster
-        with the Unknown sentinel record (country_id = 0) excluded.
-        239 active countries. Ready for dim_country.
+    description: >
+      One row per country. Passthrough from stg_repairlink__countrymaster
+      with the Unknown sentinel record (country_id = 0) excluded.
+      239 active countries. Ready for downstream reference usage.
+
     columns:
       - name: country_id
-        description: Primary key and ISO 3166-1 numeric country code.
-        tests: [not_null, unique]
+        description: ISO numeric country identifier.
+        tests:
+          - unique
+          - not_null
       - name: country_name
-        description: Full formal country name.
-        tests: [not_null]
+        description: Country name.
       - name: two_letter_iso_code
-        description: ISO 3166-1 alpha-2 code (e.g. US, GB).
-        tests: [not_null]
+        description: ISO alpha-2 country code.
       - name: three_letter_iso_code
-        description: ISO 3166-1 alpha-3 code (e.g. USA, GBR).
-        tests: [not_null]
-      - name: ingested_at
-        description: Fivetran sync timestamp.
+        description: ISO alpha-3 country code.
 
 
   - name: ref_repairlink__currency
