@@ -130,12 +130,6 @@ models:
       - name: vehicle_model
         description: Original RepairLink vehicle model.
 
-      - name: vehicle_make_vintelligence
-        description: Canonical vehicle make from VIN intelligence enrichment.
-
-      - name: vehicle_model_vintelligence
-        description: Canonical vehicle model from VIN intelligence enrichment.
-
       - name: vin_vintelligence
         description: VIN returned from VIN intelligence enrichment.
 
