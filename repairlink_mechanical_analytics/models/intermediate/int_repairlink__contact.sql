@@ -18,7 +18,7 @@ filtered as (
 
 normalized as (
     select
-        org_key,
+        upper(trim(org_key)) as org_key, -- https://oeconnection.atlassian.net/browse/DAT-2460 normalization
         contact_type_id,
 
         -- Text normalization
