@@ -24,9 +24,9 @@ normalized as (
         -- Text normalization
         upper(trim(org_name))                                            as org_name,
         name_title,
-        initcap(first_name)                                               as first_name,
+        initcap(trim(first_name))                                               as first_name,
         middle_name,
-        initcap(last_name)                                                as last_name,
+        initcap(trim(last_name))                                                as last_name,
         last_name_2,
         name_suffix,
         nickname,
