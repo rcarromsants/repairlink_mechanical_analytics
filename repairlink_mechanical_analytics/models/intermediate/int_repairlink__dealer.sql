@@ -59,12 +59,12 @@ dealer_universe as (
         case
             when c.dealer_id is not null then true
             else false
-        end as is_contact_observed,
+        end as is_contact_source,
 
         case
             when o.dealer_id is not null then true
             else false
-        end as is_operationally_observed
+        end as is_dealer_source
 
     from contact_dealers c
 
@@ -130,8 +130,8 @@ final as (
     select
         d.dealer_id,
 
-        d.is_contact_observed,
-        d.is_operationally_observed,
+        d.is_contact_source,
+        d.is_dealer_source,
 
         -- OEM metrics
         coalesce(o.total_oem_count, 0)  as total_oem_count,

@@ -49,12 +49,12 @@ shop_universe as (
         case
             when c.shop_id is not null then true
             else false
-        end as is_contact_observed,
+        end as is_contact_source,
 
         case
             when o.shop_id is not null then true
             else false
-        end as is_operationally_observed
+        end as is_shop_source
 
     from contact_shops c
 
@@ -125,8 +125,8 @@ final as (
         s.location_code,
         s.order_type,
 
-        s.is_contact_observed,
-        s.is_operationally_observed,
+        s.is_contact_source,
+        s.is_shop_source,
 
         c.contact_type_id,
 

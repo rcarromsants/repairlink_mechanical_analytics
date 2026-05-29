@@ -179,6 +179,7 @@ Normalization
 
 Applies lightweight text normalization to:
 
+org_key;
 organization names;
 first/last names;
 city/state;
@@ -186,9 +187,9 @@ address formatting.
 
 Special handling:
 
-converts STE → SUITE
-removes punctuation from address_line_2
-Deduplication
+normalizes org_key to uppercase and trims leading/trailing spaces;
+converts STE → SUITE;
+removes punctuation from address_line_2.
 
 Deduplicates to:
 
@@ -198,6 +199,13 @@ keeping:
 
 the most recently updated row;
 the row with the richest identifying information.
+
+Important note
+
+ORG_KEY is a critical organizational identifier used downstream for
+dealer and shop entity discovery. The field is normalized to uppercase
+to prevent matching inconsistencies caused by casing variations
+(e.g. 001-AI5-SPA-000 vs 001-AI5-SPa-000).
 
 Important relationships
 Relationship	Logic
@@ -243,18 +251,25 @@ This enhancement improves:
 dealer coverage;
 transactional alignment;
 operational completeness.
-Observability flags
+
+Source tracking flags
 
 The model exposes:
 
-is_contact_observed
-is_operationally_observed
+is_contact_source
+is_dealer_source
 
-to support:
+to indicate whether a dealer entity was identified through:
+
+organizational contact activity;
+operational dealer datasets.
+
+These flags support:
 
 entity coverage analysis;
-future business validation;
-rollback assessment if needed.
+business validation;
+future rollback assessment if required.
+
 Important note
 
 This logic should be revisited with the business in the future to confirm whether contact-derived entities should permanently contribute to the canonical dealer universe.
@@ -315,21 +330,41 @@ contact type semantics.
 Contact type semantics come from:
 
 ref_repairlink__contact_type
-Observability flags
+
+Source tracking flags
 
 The model exposes:
 
-is_contact_observed
-is_operationally_observed
+is_contact_source
+is_shop_source
 
-to support:
+to indicate whether a shop entity was identified through:
+
+organizational contact activity;
+operational shop configuration data.
+
+These flags support:
 
 entity coverage analysis;
 business validation;
-operational completeness tracking.
+future rollback assessment if required.
+
 Important note
 
 This logic should be revisited with the business in the future to confirm whether contact-derived entities should permanently contribute to the canonical shop universe.
+
+##### int_repairlink__dealer e int_repairlink__shop → Important note
+
+Additional validation
+
+A comparison between the operational entity universe and the
+contact-driven universe identified additional entities that exist only
+in organizational contact activity.
+
+Timestamp analysis using created_at, updated_at and ingested_at did not
+identify any clear temporal pattern, suggesting that these entities are
+not exclusively older or newer than those present in the operational
+datasets.
 
 
 #### int_repairlink__vehicle

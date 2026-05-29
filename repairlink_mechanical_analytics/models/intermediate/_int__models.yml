@@ -15,14 +15,12 @@ models:
         tests:
           - not_null
           - unique
-      - name: is_contact_observed
+      - name: is_contact_source
         description: >
-          Indicates whether the dealer was identified through dealer-related organizational contacts (contact_type_id 101 or 104).
-      - name: is_operationally_observed
+          Indicates whether the dealer entity was identified through dealer-related organizational contacts (contact_type_id 101 or 104).
+      - name: is_dealer_source
         description: >
-          Indicates whether the dealer was identified through
-          operational dealer datasets such as dealertrial,
-          dealer_mapper, or dealeroemenrollment.
+          Indicates whether the dealer entity was identified through the operational dealer datasets (dealertrial, dealer_mapper, or dealeroemenrollment).
       - name: total_oem_count
         description: >
           Total number of OEM enrollments associated with the dealer.
@@ -76,15 +74,12 @@ models:
         description: Shop location code from SHOPCONFIG.
       - name: order_type
         description: Shop order type configuration.
-      - name: is_contact_observed
+      - name: is_contact_source
         description: >
-          Indicates whether the shop was identified through
-          shop-related organizational contacts
-          (contact_type_id 100 or 103).
-      - name: is_operationally_observed
+          Indicates whether the shop entity was identified through shop-related organizational contacts (contact_type_id 100 or 103).
+      - name: is_shop_source
         description: >
-          Indicates whether the shop was identified through
-          operational shop configuration datasets.
+          Indicates whether the shop entity was identified through the operational shop configuration dataset.
       - name: contact_type_id
         description: >
           Contact type identifier associated with the selected
