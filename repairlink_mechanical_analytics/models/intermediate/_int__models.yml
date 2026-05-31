@@ -55,6 +55,12 @@ models:
         description: Postal or ZIP code.
       - name: country_code
         description: ISO alpha-2 country code.
+      - name: contact_created_at
+        description: Timestamp from the contact record selected for dealer enrichment.
+      - name: contact_updated_at
+        description: Last update timestamp from the contact record selected for dealer enrichment.
+      - name: contact_ingested_at
+        description: Ingestion timestamp from the contact record selected for dealer enrichment.
 
   - name: int_repairlink__shop
     description: >
@@ -126,10 +132,12 @@ models:
         description: Locale/language code.
       - name: website
         description: Shop website URL.
-      - name: created_at
-        description: Source record creation timestamp.
-      - name: updated_at
-        description: Source record last update timestamp.
+      - name: contact_created_at
+        description: Timestamp from the contact record selected for shop enrichment.
+      - name: contact_updated_at
+        description: Last update timestamp from the contact record selected for shop enrichment.
+      - name: contact_ingested_at
+        description: Ingestion timestamp from the contact record selected for shop enrichment.
 
   - name: int_repairlink__manufacturer
     description: >

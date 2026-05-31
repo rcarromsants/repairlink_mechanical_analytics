@@ -26,7 +26,8 @@ select
     longitude,
     locale_code,
     website,
-    created_at,
-    updated_at
+    contact_created_at,
+    contact_updated_at,
+    contact_ingested_at
 
 from {{ ref('int_repairlink__shop') }}

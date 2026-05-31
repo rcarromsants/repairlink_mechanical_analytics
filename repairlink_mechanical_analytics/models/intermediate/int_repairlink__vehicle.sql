@@ -56,7 +56,7 @@ enriched as (
 
         coalesce(
             upper(ltrim(v.mak_nm)),
-            upper(ltrim(d.vehicle_make))
+            upper(ltrim(d.vehicle_make)) -- ltrim and trim 
         ) as vehicle_make,
 
         coalesce(
@@ -64,7 +64,7 @@ enriched as (
             upper(ltrim(d.vehicle_model))
         ) as vehicle_model,
 
-        v.vin_signi_pattrn_mask as vin_vintelligence,
+        v.vin_signi_pattrn_mask as vin_vintelligence, --
 
         case
             when v.mak_nm is not null then true

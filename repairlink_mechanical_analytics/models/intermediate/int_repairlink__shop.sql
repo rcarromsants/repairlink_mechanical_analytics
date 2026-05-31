@@ -157,8 +157,9 @@ final as (
         c.locale_code,
         c.website,
 
-        c.created_at,
-        c.updated_at
+        c.created_at  as contact_created_at,
+        c.updated_at  as contact_updated_at,
+        c.ingested_at as contact_ingested_at
 
     from shop_universe s
 

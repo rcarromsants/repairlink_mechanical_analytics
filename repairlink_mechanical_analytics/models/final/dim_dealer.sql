@@ -16,5 +16,10 @@ select
     city,
     state,
     postal_code,
-    country_code
+    country_code, 
+    is_contact_source,
+    is_dealer_source,
+    contact_created_at,
+    contact_updated_at,
+    contact_ingested_at
 from {{ ref('int_repairlink__dealer') }}

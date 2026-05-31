@@ -111,7 +111,10 @@ contact_enrichment as (
         city,
         state,
         postal_code,
-        country_code
+        country_code,
+        created_at,
+        updated_at,
+        ingested_at
 
     from {{ ref('int_repairlink__contact') }}
 
@@ -154,7 +157,10 @@ final as (
         c.city,
         c.state,
         c.postal_code,
-        c.country_code
+        c.country_code,
+        c.created_at  as contact_created_at,
+        c.updated_at  as contact_updated_at,
+        c.ingested_at as contact_ingested_at
 
     from dealer_universe d
 
