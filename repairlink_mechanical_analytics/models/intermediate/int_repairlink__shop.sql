@@ -103,7 +103,8 @@ contact_enrichment as (
         website,
 
         created_at,
-        updated_at
+        updated_at,
+        ingested_at
 
     from {{ ref('int_repairlink__contact') }}
 
