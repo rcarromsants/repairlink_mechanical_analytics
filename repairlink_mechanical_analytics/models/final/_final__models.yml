@@ -6,16 +6,17 @@ models:
     description: >
       Comprehensive dealer entity dataset.
       One row per dealer (11-char canonical dealer_id).
-      The dealer universe is the union of all distinct dealer_ids across
-      dealertrial, dealer_mapper (both ends), and dealeroemenrollment.
-      Enriched with OEM enrollment counts and the latest contact /
-      organisational information.
-      See dim_dealer_trial for dealer trial lifecycle context.
+      The dealer universe combines operational dealer datasets and
+      dealer-related organisational contacts.
+      Enriched with OEM enrollment counts and organisational information.
+      See dim_dealer_trial for dealer lifecycle context.
 
     columns:
       - name: dealer_id
         description: 11-char canonical dealer identifier.
-        tests: [not_null]
+        tests: 
+          - not_null
+          - unique
 
       - name: total_oem_count
         description: Total OEM enrollments (active + inactive) for this dealer.
@@ -56,6 +57,21 @@ models:
 
       - name: country_code
         description: ISO 3166-1 alpha-2 country code.
+
+      - name: is_contact_source
+        description: Indicates whether the dealer was identified through dealer-related organisational contacts.
+
+      - name: is_dealer_source
+        description: Indicates whether the dealer was identified through operational dealer datasets.
+
+      - name: contact_created_at
+        description: Creation timestamp of the contact record selected for dealer enrichment.
+
+      - name: contact_updated_at
+        description: Last update timestamp of the contact record selected for dealer enrichment.
+
+      - name: contact_ingested_at
+        description: Ingestion timestamp of the contact record selected for dealer enrichment.
 
 
 
@@ -107,7 +123,9 @@ models:
     columns:
       - name: vin
         description: Vehicle VIN identifier.
-        tests: [not_null]
+        tests: 
+          - not_null
+          - unique
 
       - name: vehicle_id
         description: Source vehicle identifier.
@@ -125,13 +143,13 @@ models:
         description: Vehicle model year.
 
       - name: vehicle_make
-        description: Original RepairLink vehicle make.
+        description: Canonical vehicle make. VIN Intelligence values are preferred when available; otherwise normalized RepairLink values are used.
 
       - name: vehicle_model
-        description: Original RepairLink vehicle model.
+        description: Canonical vehicle model. VIN Intelligence values are preferred when available; otherwise normalized RepairLink values are used.
 
       - name: vin_vintelligence
-        description: VIN returned from VIN intelligence enrichment.
+        description: VIN intelligence signature matched during enrichment.
 
       - name: vin_decoded_correctly
         description: Indicates whether VIN decoding was successful.
@@ -150,11 +168,16 @@ models:
   - name: dim_shop
     description: >
       Shop entity dataset enriched with organisational and contact information.
+      The shop universe combines operational shop configuration records
+      and shop-related organisational contacts.
 
     columns:
       - name: shop_id
         description: Source shop identifier.
-        tests: [not_null]
+        tests: 
+          - not_null
+          - unique
+
 
       - name: org_name
         description: Organisation name.
@@ -180,11 +203,20 @@ models:
       - name: website
         description: Shop website URL.
 
-      - name: created_at
-        description: Source record creation timestamp.
+      - name: is_contact_source
+        description: Indicates whether the shop was identified through shop-related organisational contacts.
 
-      - name: updated_at
-        description: Source record last update timestamp.
+      - name: is_shop_source
+        description: Indicates whether the shop was identified through operational shop configuration data.
+      
+      - name: contact_created_at
+        description: Creation timestamp of the contact record selected for shop enrichment.
+
+      - name: contact_updated_at
+        description: Last update timestamp of the contact record selected for shop enrichment.
+
+      - name: contact_ingested_at
+        description: Ingestion timestamp of the contact record selected for shop enrichment.
 
 
 
@@ -195,7 +227,9 @@ models:
     columns:
       - name: manufacturer_id
         description: Manufacturer identifier from RepairLink.
-        tests: [not_null]
+        tests: 
+          - not_null
+          - unique
 
       - name: manufacturer_name_long
         description: Long manufacturer display name.
@@ -278,7 +312,7 @@ models:
         description: Indicates whether the OEM enrollment is active.
 
       - name: enrolled_at
-        description: Enrollment creation timestamp.
+        description: OEM enrollment creation timestamp.
 
       - name: updated_at
         description: Source record last update timestamp.

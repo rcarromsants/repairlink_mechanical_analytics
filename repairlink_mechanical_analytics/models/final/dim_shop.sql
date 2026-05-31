@@ -26,6 +26,8 @@ select
     longitude,
     locale_code,
     website,
+    is_contact_source,
+    is_shop_source,
     contact_created_at,
     contact_updated_at,
     contact_ingested_at
