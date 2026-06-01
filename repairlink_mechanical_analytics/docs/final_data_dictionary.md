@@ -1,239 +1,298 @@
-# RepairLink Final (Marts) Models — Data Dictionary
-
-**Jira epic:** [DAT-2215 — Identify DIM Tables](https://oeconnection.atlassian.net/browse/DAT-2215)
-**Companion docs:** [`staging_data_dictionary.md`](./staging_data_dictionary.md), [`intermediate_data_dictionary.md`](./intermediate_data_dictionary.md)
-**Strategy refs:** [Surrogate Key Strategy](https://oeconnection.atlassian.net/wiki/spaces/PDD/pages/1059684438/Surrogate+Key+Strategy), [Slowly Changing Dimension Strategy](https://oeconnection.atlassian.net/wiki/spaces/PDD/pages/1058177171/Slowly+Changing+Dimension+Strategy)
-**Materialization:** `table` (full refresh)
-**Schema:** `dbt_<user>_final` (per-developer in dev; production schema TBD)
-
----
+# RepairLink Final Models — Data Dictionary
 
 ## Overview
 
-The final layer holds analyst-facing dimension tables. Each dim has:
+The final layer contains analyst-facing dimensional and bridge models built from the intermediate layer.
 
-- A **surrogate key** (`*_key`) — deterministic MD5 hash of the natural key, generated via `dbt_utils.generate_surrogate_key()`
-- The **natural key** preserved (so joins from facts can still use the business identifier)
-- One additional **"Unknown" row** with a stable surrogate key from the literal `'UNKNOWN'`, so late-arriving facts can `coalesce()` to a valid key instead of producing null joins
+These models expose business-ready entities while preserving source lineage and supporting future analytical expansion.
 
-All 5 dims in this layer are **Type 1** (current state only). The SCD strategy doc recommends Type 2 for `dim_dealer` and `dim_shop` long-term — we deferred that to keep the first delivery simple and will revisit once historical-version requirements emerge.
+Current dimensions:
 
-### Architecture flow
+* dim_dealer
+* dim_shop
+* dim_manufacturer
+* dim_vehicle
+
+Current bridges:
+
+* bridge_dealer_oem
+* bridge_dealer_distance
+
+Reference dimensions:
+
+* dim_country
+* dim_currency
+
+---
+
+## Architecture Flow
 
 ```
 INTERMEDIATE                           FINAL
 ────────────                           ─────
+
 int_repairlink__dealer ─────────────► dim_dealer
 int_repairlink__shop ───────────────► dim_shop
 int_repairlink__manufacturer ───────► dim_manufacturer
-int_repairlink__country ────────────► dim_country
-int_repairlink__currency ───────────► dim_currency
 int_repairlink__vehicle ────────────► dim_vehicle
-                                       ❌ dim_contact (deferred — see end of doc)
+
+ref_repairlink__country ────────────► dim_country
+ref_repairlink__currency ───────────► dim_currency
+
+bridge_dealer_oem ──────────────────► bridge_dealer_oem
+bridge_dealer_distance ─────────────► bridge_dealer_distance
 ```
 
 ---
 
-## Surrogate key convention
+## dim_dealer
 
-| | Pattern |
-|---|---|
-| Surrogate column name | `<entity>_key` (e.g. `dealer_key`, `shop_key`) |
-| Hash function | `dbt_utils.generate_surrogate_key([<natural_key>])` |
-| Hash input — regular row | natural key column (e.g. `dealer_id`, `vin`, `country_id`) |
-| Hash input — Unknown row | literal `'UNKNOWN'` |
-| Resulting type | `VARCHAR(32)` (hexadecimal MD5) |
+### Purpose
 
-**Why hashing instead of sequences:** the marts are rebuilt via full refresh. Auto-incrementing keys would break every downstream foreign key on every rebuild. Hashing produces the same key for the same input forever.
+Canonical dealer entity dimension.
 
-**Fact table lookups:** future fact tables should `LEFT JOIN` to dims on the natural key, then `COALESCE` the surrogate key to the Unknown row's key when the join misses:
+The dealer universe combines:
 
-```sql
-left join dim_dealer d on f.dealer_id = d.dealer_id
--- ...
-coalesce(d.dealer_key, '<UNKNOWN hash>') as dealer_key
-```
+* operational dealer datasets
 
----
+  * dealertrial
+  * dealer_mapper
+  * dealeroemenrollment
 
-## Per-dim catalogue
+and
 
-### 1. `dim_dealer`
+* dealer-related organizational contacts
 
-| | |
-|---|---|
-| **SCD type** | Type 1 (current state only) |
-| **Source** | `int_repairlink__dealer` |
-| **Natural key** | `dealer_id` |
-| **Surrogate key** | `dealer_key` = MD5(`dealer_id`) |
-| **Expected row count** | 18 dealer rows + 1 Unknown row = 19 |
+  * contact_type_id 101
+  * contact_type_id 104
 
-**Columns kept:** `dealer_key`, `dealer_id`, `dealer_trial_id`, `total_oem_enrollment_count`, `active_oem_enrollment_count`, `trial_started_at`, `trial_ended_at`, `created_at`, `updated_at`, `ingested_at`
+This approach ensures dealer entities identified through contact activity are not excluded from analytical reporting.
 
-**Columns intentionally dropped:**
-- `status_id` — only one distinct value (1) in dev data; no analytical signal
-- `connected_dealer_count` — always 0 in dev (dealertrial population doesn't overlap with dealer_mapper population); revisit once live data is flowing
+### Key Fields
 
----
+| Column            | Description                                           |
+| ----------------- | ----------------------------------------------------- |
+| dealer_id         | Canonical 11-character dealer identifier              |
+| total_oem_count   | Total OEM enrollments                                 |
+| active_oem_count  | Active OEM enrollments                                |
+| is_contact_source | Dealer identified through contacts                    |
+| is_dealer_source  | Dealer identified through operational dealer datasets |
 
-### 2. `dim_shop`
+### Contact Enrichment
 
-| | |
-|---|---|
-| **SCD type** | Type 1 |
-| **Source** | `int_repairlink__shop` |
-| **Natural key** | `shop_id` |
-| **Surrogate key** | `shop_key` = MD5(`shop_id`) |
-| **Expected row count** | 15 shop rows + 1 Unknown row = 16 |
+Dealer entities are enriched with the latest dealer-related contact record.
 
-**Columns kept:** `shop_key`, `shop_id`, `location_code`, `order_type`, `created_at`, `updated_at`
+The following timestamps originate from the selected contact record and do not represent dealer lifecycle timestamps:
 
-**Columns intentionally dropped:**
-- `created_by`, `updated_by` — only one distinct value in dev data (single operator)
-- `ingested_at` — no analytical value at the dim level
-
-**Note on `order_type`:** kept in the projection but always = 1 in dev data. Will become useful once production order types diversify.
+* contact_created_at
+* contact_updated_at
+* contact_ingested_at
 
 ---
 
-### 3. `dim_manufacturer`
+## dim_shop
 
-| | |
-|---|---|
-| **SCD type** | Type 1 |
-| **Source** | `int_repairlink__manufacturer` (sentinel id=0 excluded upstream) |
-| **Natural key** | `manufacturer_id` |
-| **Surrogate key** | `manufacturer_key` = MD5(`manufacturer_id`) |
-| **Expected row count** | 77 manufacturers + 1 Unknown = 78 |
+### Purpose
 
-**Important column note:** the source has a column also called `manufacturer_key` (a text business key like `'GM'`, `'DCX'`). To avoid clashing with the surrogate key name, that column is renamed in the dim to `manufacturer_business_key`.
+Canonical shop entity dimension.
 
-**Industry segments** in `industry_id`:
-- 1 = Automotive OEM
-- 4 = Construction / Heavy Equipment
-- 5 = Commercial Trucks
+The shop universe combines:
 
----
+* operational shop configuration records
+* shop-related organizational contacts
 
-### 4. `dim_country`
+  * contact_type_id 100
+  * contact_type_id 103
 
-| | |
-|---|---|
-| **SCD type** | Type 1 |
-| **Source** | `int_repairlink__country` (sentinel id=0 excluded upstream) |
-| **Natural key** | `country_id` (this **is** the ISO 3166-1 numeric code, not an arbitrary internal ID) |
-| **Surrogate key** | `country_key` = MD5(`country_id`) |
-| **Expected row count** | 239 countries + 1 Unknown = 240 |
+This ensures shops referenced through contact activity are retained even when not present in operational shop configuration data.
 
-**Unknown row defaults:** `two_letter_iso_code = 'XX'`, `three_letter_iso_code = 'XXX'`, `country_name = 'Unknown'`.
+### Key Fields
 
-Notable use: `int_repairlink__contact.country_code` (text, alpha-2) joins to `dim_country.two_letter_iso_code`, **not** to the numeric `country_id`.
+| Column            | Description                                  |
+| ----------------- | -------------------------------------------- |
+| shop_id           | Shop identifier                              |
+| location_code     | Operational location code                    |
+| order_type        | Shop order type                              |
+| is_contact_source | Shop identified through contacts             |
+| is_shop_source    | Shop identified through operational datasets |
 
----
+### Contact Enrichment
 
-### 5. `dim_currency`
+Shop entities are enriched using the latest shop-related contact record.
 
-| | |
-|---|---|
-| **SCD type** | Type 1 |
-| **Source** | `int_repairlink__currency` (sentinel id=0 excluded upstream) |
-| **Natural key** | `currency_id` (this **is** the ISO 4217 numeric code) |
-| **Surrogate key** | `currency_key` = MD5(`currency_id`) |
-| **Expected row count** | 164 currencies + 1 Unknown = 165 |
+The following timestamps originate from the selected contact record:
 
-⚠️ **Important caveat:** `currency_name` is **NOT unique**. The name `'Kwacha'` refers to **two distinct currencies**:
-- MWK — Malawian Kwacha
-- ZMK — Zambian Kwacha
+* contact_created_at
+* contact_updated_at
+* contact_ingested_at
 
-This is a legitimate real-world overlap, not a data quality issue. **Always join on `currency_code` (ISO 4217 alpha-3) which IS unique. Never use `currency_name` as a join key.**
+These timestamps do not represent shop creation or lifecycle events.
 
 ---
 
-### 6. `dim_vehicle`
+## dim_vehicle
 
-| | |
-|---|---|
-| **SCD type** | Type 1 (per SCD strategy — VIN attributes are immutable, only corrections expected) |
-| **Source** | `int_repairlink__vehicle` (deduplicated by VIN upstream) |
-| **Natural key** | `vin` |
-| **Surrogate key** | `vehicle_key` = MD5(`vin`) |
-| **Expected row count** | ~3.35M vehicles + 1 Unknown |
+## Purpose
 
-**VIN intelligence enrichment:** the dim carries both the RepairLink-source values (`vehicle_make`, `vehicle_model`) and the canonical values from the VIN intelligence dataset (`vehicle_make_vintelligence`, `vehicle_model_vintelligence`). Long-term, BI will switch to the vintelligence variants once enrichment coverage is confirmed.
+Canonical vehicle dimension.
 
-**Columns kept:** `vehicle_key`, `vin`, `vehicle_id`, `transaction_id`, `vehicle_type_id`, `status_id`, `vehicle_year`, `vehicle_make`, `vehicle_model`, `vehicle_make_vintelligence`, `vehicle_model_vintelligence`, `vin_vintelligence`, `vin_decoded_correctly`, `created_at`, `updated_at`, `ingested_at`
+One row per VIN.
 
-**Columns intentionally dropped:**
-- `odometer_reading`, all `plate_*`, `auto_pickup_at`, `auto_dropoff_at` — 100% null in dev
-- `document_id`, `owner_id`, `vin_source`, `body_trim_code`, `paint_exterior_color_code` — 100% null in dev
-- `vin_suffix_vehicle`, `vin_suffix_vintelligence` — testing only, will be removed from the intermediate model
+Vehicle records are deduplicated in the intermediate layer and enriched using Automotive Dimensions VIN Intelligence data.
 
-**Single-value caveats** (still in the dim):
-- `vehicle_type_id` always = 103 in dev
-- `status_id` always = 1 in dev
-- `vin_decoded_correctly` always = false in dev
+### Make / Model Standardization
 
----
+Vehicle attributes follow the hierarchy:
 
-## ❌ `dim_contact` — deferred
+1. VIN Intelligence values
+2. Normalized RepairLink values (fallback)
 
-`dim_contact` was considered but **not built in this delivery**. The reasoning:
+This produces canonical values for:
 
-- `int_repairlink__contact` has 57.7M rows that are **transactional in nature** (one row per transaction contact, the same person/org appears N times)
-- It carries `transaction_id` and `document_id` — fact-table signals, not dimension signals
-- Person identity resolution (merging duplicate "Bob Smith" rows correctly) is its own project and requires business rules we don't yet have
+* vehicle_make
+* vehicle_model
 
-**Future direction:** when the first transaction fact (`fct_transaction` / `fct_document`) is built, we'll decide whether to:
-- Build a slim `dim_contact` after identity resolution + a `fct_transaction_contact` bridge, or
-- Keep contact attributes denormalised on the fact tables
+even when VIN enrichment is unavailable.
 
-If a `dim_contact` becomes urgent before identity resolution lands, the fallback is a thin Type 1 with `contact_id` as the natural key (one dim row per source row, ~57M).
+### Key Fields
 
----
+| Column                | Description                         |
+| --------------------- | ----------------------------------- |
+| vin                   | Vehicle Identification Number       |
+| vehicle_make          | Canonical make                      |
+| vehicle_model         | Canonical model                     |
+| vin_vintelligence     | VIN Intelligence pattern match      |
+| vin_decoded_correctly | Indicates successful VIN enrichment |
 
-## Counts to validate after first build
+### Notes
 
-Run this in Snowflake after `dbt build --select final+`:
+VIN enrichment coverage is still being monitored.
 
-```sql
-USE DATABASE <your_dev_db>;
-USE SCHEMA dbt_<user>_final;
-
-SELECT 'dim_dealer'        AS model, count(*) AS rows FROM dim_dealer
-UNION ALL SELECT 'dim_shop',                    count(*) FROM dim_shop
-UNION ALL SELECT 'dim_manufacturer',            count(*) FROM dim_manufacturer
-UNION ALL SELECT 'dim_country',                 count(*) FROM dim_country
-UNION ALL SELECT 'dim_currency',                count(*) FROM dim_currency
-UNION ALL SELECT 'dim_vehicle',                 count(*) FROM dim_vehicle
-ORDER BY rows DESC;
-```
-
-Expected:
-- `dim_dealer`: 19 (18 + Unknown)
-- `dim_shop`: 16 (15 + Unknown)
-- `dim_manufacturer`: 78 (77 + Unknown)
-- `dim_country`: 240 (239 + Unknown)
-- `dim_currency`: 165 (164 + Unknown)
-- `dim_vehicle`: ~3.35M + Unknown
+Unmatched VINs automatically fall back to normalized RepairLink values.
 
 ---
 
-## Tests
+## dim_manufacturer
 
-Each dim has at minimum:
-- `not_null` + `unique` on the surrogate `*_key`
-- `not_null` on the natural key (so the Unknown row's literal `'UNKNOWN'` value still passes)
+### Purpose
 
-Run with:
-```bash
-dbt test --select final
-```
+Canonical manufacturer dimension.
+
+One row per manufacturer.
+
+The dimension is sourced from the RepairLink manufacturer master dataset.
+
+### Key Fields
+
+| Column                    | Description             |
+| ------------------------- | ----------------------- |
+| manufacturer_id           | Manufacturer identifier |
+| manufacturer_name_long    | Full manufacturer name  |
+| manufacturer_name_short   | Short manufacturer name |
+| manufacturer_business_key | Source business key     |
+| industry_id               | Industry segment        |
 
 ---
 
-## Looking ahead
+## dim_country
 
-1. **SCD Type 2 for dim_dealer and dim_shop** — once history requirements emerge (shop renames, dealer status changes), introduce `snapshots/snp_dealer.sql` and `snapshots/snp_shop.sql` and re-key the surrogates as MD5(`<natural_key>`, `dbt_valid_from`).
-2. **`dim_contact`** — will be revisited when the first transaction fact is built.
-3. **Vehicle make/model normalization** — once VIN intelligence coverage is verified, switch BI to use `vehicle_make_vintelligence` and drop the original-RepairLink columns.
-4. **Production schemas** — current dev config writes to `dbt_<user>_final`. Production should map to a stable `FINAL` schema (or per-environment overrides).
+### Purpose
+
+Country reference dimension.
+
+One row per ISO country.
+
+### Notes
+
+country_id corresponds to the ISO 3166-1 numeric code.
+
+country_code values from contact entities should join through:
+
+* two_letter_iso_code
+
+not through country_id.
+
+---
+
+## dim_currency
+
+### Purpose
+
+Currency reference dimension.
+
+One row per ISO currency.
+
+### Notes
+
+currency_id corresponds to the ISO 4217 numeric code.
+
+currency_name is not guaranteed to be unique.
+
+Analytical joins should use:
+
+* currency_code
+
+rather than currency_name.
+
+---
+
+## bridge_dealer_oem
+
+### Purpose
+
+Represents dealer-to-OEM enrollment relationships.
+
+One row per dealer OEM enrollment.
+
+### Key Fields
+
+* dealer_oem_enrollment_id
+* dealer_id
+* oem_id
+* is_active
+* enrolled_at
+
+---
+
+## bridge_dealer_distance
+
+### Purpose
+
+Represents dealer-to-dealer distance relationships.
+
+One row per dealer pair.
+
+### Key Fields
+
+* from_dealer_id
+* to_dealer_id
+* distance_km
+* group_id
+* status
+
+---
+
+## Data Quality Notes
+
+The final layer focuses on business consumption rather than source-level validation.
+
+Detailed profiling and source quality assessments are performed in the staging and intermediate layers.
+
+Validation at the final layer focuses primarily on:
+
+* entity uniqueness
+* key completeness
+* referential integrity
+* source lineage consistency
+
+---
+
+## Future Enhancements
+
+1. Revisit dealer and shop universe definitions with business stakeholders to confirm whether contact-derived entities should permanently contribute to the canonical entity population.
+
+2. Continue monitoring VIN Intelligence coverage and unmatched VIN populations.
+
+3. Evaluate Type 2 history requirements for dealer and shop entities.
+
+4. Reassess the need for a dedicated contact dimension once transactional fact models are introduced.
