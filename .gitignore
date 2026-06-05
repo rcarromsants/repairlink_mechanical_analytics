@@ -16,3 +16,4 @@ dbt_packages/
 *.swp
 .vscode/
 .idea/
+dbt_internal_packages/

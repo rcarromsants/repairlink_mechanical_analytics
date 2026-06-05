@@ -60,4 +60,26 @@ sources:
       - name: DEALEROEMENROLLMENT
         description: >
           OEM enrollment records per dealer. Enriches dim_dealer with OEM relationship data.
+      
+      ################### Transaction Sources : Fact tables ####################
+      - name: TRANSACTION_TRX_TRANSACTION
+        description: >
+          Core transaction entity representing the top-level business event
+          between buyers and sellers. Primary source for fct_transaction.
 
+      - name: TRANSACTION_TRX_DOCUMENT
+        description: >
+          Business documents associated with transactions, including quotes,
+          purchase orders, invoices, shipments, and related artifacts.
+          Primary source for fct_document.
+
+      - name: TRANSACTION_TRX_LINEITEM
+        description: >
+          Individual products and services contained within transaction documents.
+          Primary source for fct_lineitem.
+
+      - name: TRANSACTION_TRX_PARTPOOL
+        description: >
+          Part sourcing and catalog records associated with transactions.
+          Supports part validation, alternates, substitutions, and pricing analysis.
+          Primary source for fct_partpool.
