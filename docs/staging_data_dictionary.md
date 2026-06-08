@@ -20,8 +20,10 @@ The goal of the epic is to identify and model the relevant dim tables → shops,
 
 Tables that are operational, audit, log, or cross-reference (`*_AUD_*`, `*_HST_*`, `*_LOG_*`, `*_XRF_*`, `INTEGRATION_OUTBOX_*`, etc.) were intentionally excluded — they don't add analytical value at the dim layer.
 
+> **Exception (DAT-2514, fact layer):** `PMAPROGRAM_XRF_LINEITEM` is an `*_XRF_*` table that was excluded above for the dim scope, but is intentionally brought in as a **fact source** (`stg_repairlink__pma_lineitem` → `fct_pma_lineitem`) because the PMA reimbursement program is an analytical event in its own right. See the *Fact-layer staging* section below and DAT-2586.
 
-Current Staging Models
+
+Current Staging Models (dim layer — DAT-2215)
 
 stg_repairlink__contact	Transactional organizational contact source data
 stg_repairlink__dealertrial	Dealer lifecycle and trial records
@@ -248,6 +250,44 @@ Run them with: `dbt test --select staging`
 
 ---
 
+## Fact-layer staging (epic DAT-2514)
+
+The dim-layer scope above deliberately excluded transactional and `*_XRF_*` tables. Under
+**DAT-2514** the RepairLink transaction tables were added as staging models that feed the
+**fact layer** (`fct_*`) rather than dimensions. These follow the same staging conventions
+(incremental on `_fivetran_synced`, `where not _fivetran_deleted`, snake_case casts):
+
+| Staging model | Source table | Feeds |
+| --- | --- | --- |
+| `stg_repairlink__transaction` | `TRANSACTION_TRX_TRANSACTION` | `fct_transaction` |
+| `stg_repairlink__document` | `TRANSACTION_TRX_DOCUMENT` | `fct_document` |
+| `stg_repairlink__lineitem` | `TRANSACTION_TRX_LINEITEM` | `fct_lineitem` |
+| `stg_repairlink__partpool` | `TRANSACTION_TRX_PARTPOOL` | `fct_partpool` |
+| `stg_repairlink__pma_lineitem` | `PMAPROGRAM_XRF_LINEITEM` | `fct_pma_lineitem` |
+
+### stg_repairlink__pma_lineitem
+
+Source table	PMAPROGRAM_XRF_LINEITEM (~15.4M rows)
+Grain	One row per line item (`line_item_id` is the source PK and is unique)
+Purpose	PMA (Parts Mechanical/Manufacturer Allowance) reimbursement-program cross-reference — records which program a part qualified for, its program value, and the qualification/match outcome.
+Notes
+
+Modeled as a **separate fact** (`fct_pma_lineitem`), **not** an enrichment of `fct_lineitem`. Per
+DAT-2586, the overlap is too low to inner-join:
+
+- `TRANSACTION_TRX_LINEITEM`: 37.9M rows · `PMAPROGRAM_XRF_LINEITEM`: 15.4M rows
+- Matching line items: 3.99M (~10.5% of transaction line items have a PMA record)
+- ~73% of PMA records reference line items no longer present in `TRANSACTION_TRX_LINEITEM`
+
+`line_item_id` is therefore an **optional** relationship to `fct_lineitem` — any downstream join
+must be a **LEFT join** and the partial coverage documented. No intermediate model is used: the
+staging grain already matches the fact grain and no enrichment join is required.
+
+`program_value` interpretation varies by `program_id` — it may be a percentage (e.g. `0.15` = 15%)
+or a flat amount (e.g. `55.97`); interpret per program.
+
+---
+
 ## Source table reference
 
 The source `repairlink` is configured at:
@@ -259,4 +299,6 @@ sources:
     schema: REPAIRLINK_SQLSERVER_DBO
 ```
 
-All 11 source tables are declared in `models/staging/_repairlink__sources.yml`.
+All source tables are declared in `models/staging/_repairlink__sources.yml` (dim-layer tables from
+DAT-2215 plus the transaction/fact-layer tables added under DAT-2514, including
+`PMAPROGRAM_XRF_LINEITEM`).

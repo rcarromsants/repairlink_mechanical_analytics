@@ -906,3 +906,56 @@ models:
         description: Record last updated timestamp (source UPDATEDON).
       - name: ingested_at
         description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__pma_lineitem
+    description: >
+      Staged PMA (Parts Mechanical/Manufacturer Allowance) program cross-reference records
+      at line item grain (~15.4M rows). Source PMAPROGRAM_XRF_LINEITEM. One row per line item
+      recording the reimbursement program a part qualified for, its program value, and the
+      qualification/match outcome. Modeled as a SEPARATE analytical fact (fct_pma_lineitem),
+      NOT an enrichment of fct_lineitem — only ~10.5% of TRANSACTION_TRX_LINEITEM rows have a
+      matching PMA record and ~73% of PMA records reference line items no longer present in
+      TRANSACTION_TRX_LINEITEM (see DAT-2586). line_item_id is the source PK and an OPTIONAL
+      relationship to fct_lineitem (left join only, partial coverage).
+    columns:
+      - name: line_item_id
+        description: >
+          Primary key (source LINEITEMID). Also an OPTIONAL foreign key to
+          stg_repairlink__lineitem.line_item_id — only ~10.5% of transaction line items have a
+          PMA record, so any downstream join to fct_lineitem must be a LEFT join.
+        tests: [not_null, unique]
+      - name: program_id
+        description: Identifier of the PMA reimbursement program the line item qualified for (source PROGRAMID).
+        tests: [not_null]
+      - name: transaction_id
+        description: Foreign key to stg_repairlink__transaction.transaction_id (source TRANSACTIONID).
+      - name: comparison_result_id
+        description: Identifier of the comparison result that produced the program match. Sparsely populated.
+      - name: qualification_type_id
+        description: Type of qualification applied when matching the line item to the program.
+      - name: qualification_status_id
+        description: Status of the qualification outcome. Sparsely populated in current data.
+      - name: status_id
+        description: Numeric status code for the PMA record. = 1 across observed data.
+      - name: program_value
+        description: >
+          Program reimbursement value. Interpretation varies by program — may be a percentage
+          (e.g. 0.15 = 15%) or a flat amount (e.g. 55.97). Interpret per program_id.
+      - name: program_match_message
+        description: Free-text message describing the match condition (e.g. Toyota Smart Parts OE-equivalent prompt). Often null.
+      - name: program_display_text
+        description: Customer-facing text describing the reimbursement program and how to claim it (source PROGRAMDISPLAYTEXT).
+      - name: part_num_oe_xref
+        description: OE cross-reference part number for the matched part (source PARTNUMOEXREF). Often null.
+      - name: is_show_columns
+        description: UI flag controlling whether program columns are shown (source SHOWCOLUMNS). False across observed data.
+      - name: created_by
+        description: User (GUID) who created the record.
+      - name: updated_by
+        description: User (GUID) who last updated the record.
+      - name: created_at
+        description: Record creation timestamp (source CREATEDON).
+      - name: updated_at
+        description: Record last updated timestamp (source UPDATEDON).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.

@@ -83,3 +83,13 @@ sources:
           Part sourcing and catalog records associated with transactions.
           Supports part validation, alternates, substitutions, and pricing analysis.
           Primary source for fct_partpool.
+
+      - name: PMAPROGRAM_XRF_LINEITEM
+        description: >
+          PMA program cross-reference records at line item grain (~15.4M rows).
+          Modeled as a SEPARATE analytical fact (fct_pma_lineitem), NOT as an
+          enrichment of fct_lineitem: only ~10.5% of TRANSACTION_TRX_LINEITEM rows
+          have a matching PMA record, and ~73% of PMA records reference line items
+          no longer present in TRANSACTION_TRX_LINEITEM (see DAT-2586). LINEITEMID
+          is kept as an OPTIONAL relationship to fct_lineitem (left join only,
+          partial coverage) — never an inner join. Primary source for fct_pma_lineitem.
