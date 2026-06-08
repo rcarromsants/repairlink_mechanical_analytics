@@ -1,8 +1,7 @@
-name: 'repairlink_mechanical_analytics'
+name: "repairlink_mechanical_analytics"
 config-version: 2
-version: '1.0.0'
 
-profile: 'repairlink_mechanical_analytics'
+profile: "repairlink_mechanical_analytics"
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
