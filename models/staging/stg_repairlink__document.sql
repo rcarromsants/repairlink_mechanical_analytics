@@ -56,7 +56,7 @@ renamed as (
         cast(shipservicetypeid          as integer)        as ship_service_type_id,
         cast(shipbilltypeid             as integer)        as ship_bill_type_id,
         cast(shipdropofftypeid          as integer)        as ship_dropoff_type_id,
-        cast(shipstrategytypeid         as integer)        as ship_strategy_type_id,
+        null::integer                                      as ship_strategy_type_id, -- column absent from source
         cast(shipweight                 as number(38,4))   as ship_weight,
         cast(shipweightuomid            as integer)        as ship_weight_uom_id,
         cast(shipestvalue               as number(38,4))   as ship_est_value,
