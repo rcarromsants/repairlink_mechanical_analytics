@@ -31,3 +31,11 @@ models:
     final:
       +materialized: table
       +schema: final
+
+      dimensions:
+        +materialized: table
+        +schema: final
+
+      facts:
+        +materialized: table
+        +schema: final
