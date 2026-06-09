@@ -909,21 +909,24 @@ models:
 
   - name: stg_repairlink__pma_lineitem
     description: >
-      Staged PMA (Parts Mechanical/Manufacturer Allowance) program cross-reference records
-      at line item grain (~15.4M rows). Source PMAPROGRAM_XRF_LINEITEM. One row per line item
-      recording the reimbursement program a part qualified for, its program value, and the
-      qualification/match outcome. Modeled as a SEPARATE analytical fact (fct_pma_lineitem),
-      NOT an enrichment of fct_lineitem — only ~10.5% of TRANSACTION_TRX_LINEITEM rows have a
-      matching PMA record and ~73% of PMA records reference line items no longer present in
-      TRANSACTION_TRX_LINEITEM (see DAT-2586). line_item_id is the source PK and an OPTIONAL
-      relationship to fct_lineitem (left join only, partial coverage).
+      Staged PMA (Parts Mechanical/Manufacturer Allowance) program cross-reference records.
+      Source PMAPROGRAM_XRF_LINEITEM. One row per (line_item_id, program_id) — a line item can
+      qualify for multiple programs, so line_item_id alone is NOT unique. Modeled as a SEPARATE
+      analytical fact (fct_pma_lineitem), NOT an enrichment of fct_lineitem — only ~10.5% of
+      TRANSACTION_TRX_LINEITEM rows have a matching PMA record and ~73% of PMA records reference
+      line items no longer present in TRANSACTION_TRX_LINEITEM (see DAT-2586).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - line_item_id
+            - program_id
     columns:
       - name: line_item_id
         description: >
-          Primary key (source LINEITEMID). Also an OPTIONAL foreign key to
+          Part of composite PK (source LINEITEMID). Also an OPTIONAL foreign key to
           stg_repairlink__lineitem.line_item_id — only ~10.5% of transaction line items have a
           PMA record, so any downstream join to fct_lineitem must be a LEFT join.
-        tests: [not_null, unique]
+        tests: [not_null]
       - name: program_id
         description: Identifier of the PMA reimbursement program the line item qualified for (source PROGRAMID).
         tests: [not_null]

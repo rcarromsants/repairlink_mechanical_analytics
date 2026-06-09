@@ -1,4 +1,4 @@
-{{ config(materialized='incremental', unique_key='line_item_id') }}
+{{ config(materialized='incremental', unique_key=['line_item_id', 'program_id']) }}
 
 with source as (
     select * from {{ source('repairlink', 'PMAPROGRAM_XRF_LINEITEM') }}
