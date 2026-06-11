@@ -1,9 +1,13 @@
 {{ config(materialized='table') }}
 
+with source as (
+    select * from {{ ref('stg_repairlink__lineitem') }}
+)
+
 select
     -- identity
     line_item_id,
-    line_item_no,
+    upper(trim(line_item_no))               as line_item_no,
     line_item_parent_id,
     document_id,
     part_pool_id,
@@ -16,8 +20,8 @@ select
     status_id,
 
     -- item info
-    item_name,
-    item_description,
+    upper(trim(item_name))                  as item_name,
+    upper(trim(item_description))           as item_description,
     manufacturer_id,
     unit_of_measure_id,
 
@@ -40,12 +44,12 @@ select
     amt_ext_final,
 
     -- sourcing
-    part_pool_data_source,
+    upper(trim(part_pool_data_source))      as part_pool_data_source,
     part_avail_at,
 
     -- external integration
-    external_id,
-    external_xml,
+    upper(trim(external_id))                as external_id,
+    trim(external_xml)                      as external_xml,
 
     -- metadata
     created_by,
@@ -54,4 +58,4 @@ select
     updated_at,
     ingested_at
 
-from {{ ref('int_repairlink__lineitem') }}
+from source

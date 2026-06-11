@@ -5,9 +5,14 @@ models:
   - name: fct_transaction
     description: >
       Transaction fact table at the transaction grain. One row per RepairLink transaction
-      (source TRANSACTION_TRX_TRANSACTION). Captures lifecycle dates, financial totals,
-      party org keys, and repair/insurance context. The org key columns (org_key_buyer,
-      org_key_seller, etc.) are the join path to dim_dealer and dim_shop.
+      (source TRANSACTION_TRX_TRANSACTION), sourced from int_repairlink__transaction.
+      Text normalization (UPPER/TRIM) applied at the intermediate layer on all org keys,
+      transaction_no, repair_order_number, and external_id.
+      Columns with 100% null values excluded: transaction_parent_id, workflow_id,
+      amt_parts/labor/materials/sublet/deductible, amt_trx_shipping/adjustment,
+      supplement_level, transaction_event_log_id, repair_order_type, claim_number,
+      all insurance fields, external_xml, external_ird, and all scheduling/lifecycle
+      timestamps except trx_opened_at.
 
     columns:
       - name: transaction_id
@@ -15,13 +20,7 @@ models:
         tests: [not_null, unique]
 
       - name: transaction_no
-        description: Human-readable transaction number.
-
-      - name: transaction_parent_id
-        description: Parent transaction identifier for child/supplement transactions.
-
-      - name: workflow_id
-        description: Workflow identifier governing this transaction.
+        description: Human-readable transaction number. Normalized to UPPER(TRIM()).
 
       - name: transaction_type_id
         description: Transaction type code.
@@ -43,103 +42,62 @@ models:
         description: Numeric status code.
 
       - name: org_key_buyer
-        description: Org key of the buying party. Join to dim_dealer or dim_shop.
+        description: Org key of the buying party. Normalized to UPPER(TRIM()). Join to dim_dealer or dim_shop.
 
       - name: org_key_seller
-        description: Org key of the selling party. Join to dim_dealer.
+        description: Org key of the selling party. Normalized to UPPER(TRIM()). Join to dim_dealer.
 
       - name: org_key_initiator
-        description: Org key of the party that initiated the transaction.
+        description: Org key of the party that initiated the transaction. Normalized to UPPER(TRIM()).
 
       - name: org_key_responder
-        description: Org key of the responding party.
+        description: Org key of the responding party. Normalized to UPPER(TRIM()).
 
       - name: org_key_integrator
-        description: Org key of the integrating party (e.g. DMS/EPC system).
-
-      - name: amt_parts
-        description: Parts amount on the transaction.
-
-      - name: amt_labor
-        description: Labor amount on the transaction.
-
-      - name: amt_materials
-        description: Materials amount on the transaction.
-
-      - name: amt_sublet
-        description: Sublet amount on the transaction.
-
-      - name: amt_deductible
-        description: Deductible amount.
+        description: Org key of the integrating party (e.g. DMS/EPC system). Normalized to UPPER(TRIM()).
 
       - name: amt_trx_subtotal
-        description: Transaction subtotal before tax and shipping.
+        description: Transaction subtotal before tax.
 
       - name: amt_trx_tax
         description: Tax amount on the transaction.
 
-      - name: amt_trx_shipping
-        description: Shipping amount on the transaction.
-
-      - name: amt_trx_adjustment
-        description: Adjustment amount on the transaction.
-
       - name: amt_trx_total
-        description: Total transaction amount including tax, shipping, and adjustments.
+        description: Total transaction amount.
 
       - name: currency_id
         description: Currency identifier. Join to ref_repairlink__currency.
 
       - name: trx_opened_at
         description: Timestamp when the transaction was opened.
-
-      - name: trx_closed_at
-        description: Timestamp when the transaction was closed.
-
-      - name: trx_posted_at
-        description: Timestamp when the transaction was posted.
-
-      - name: trx_voided_at
-        description: Timestamp when the transaction was voided. Null if not voided.
-
-      - name: appointment_at
-        description: Scheduled appointment timestamp.
-
-      - name: complete_estimate_at
-        description: Estimated completion timestamp.
-
-      - name: complete_actual_at
-        description: Actual completion timestamp.
-
-      - name: customer_pickup_at
-        description: Customer vehicle pickup timestamp.
-
-      - name: vehicle_dropoff_at
-        description: Vehicle drop-off timestamp.
+        tests: [not_null]
 
       - name: repair_order_number
-        description: External repair order number from the shop's DMS.
+        description: External repair order number from the shop's DMS. Normalized to UPPER(TRIM()).
 
-      - name: repair_order_type
-        description: Repair order type code from the shop's DMS.
+      - name: external_id
+        description: External system identifier. Normalized to UPPER(TRIM()).
 
-      - name: claim_number
-        description: Insurance claim number, when the transaction is insurance-related.
+      - name: external_field_1
+        description: External integration field 1. Trimmed.
 
-      - name: insurance_company_name
-        description: Insurance company name for insurance-related transactions.
+      - name: external_field_2
+        description: External integration field 2. Trimmed.
 
-      - name: external_insurance_id
-        description: External insurance system identifier.
+      - name: external_field_3
+        description: External integration field 3. Trimmed.
 
-      - name: external_insurance_branch_id
-        description: External insurance branch identifier.
+      - name: external_field_4
+        description: External integration field 4. Trimmed.
 
-      - name: supplement_level
-        description: Supplement level for multi-supplement insurance transactions (0 = original).
+      - name: external_field_5
+        description: External integration field 5. Trimmed.
 
-      - name: transaction_event_log_id
-        description: Event log identifier for audit trail.
+      - name: created_by
+        description: User (GUID) who created the record.
+
+      - name: updated_by
+        description: User (GUID) who last updated the record.
 
       - name: created_at
         description: Record creation timestamp.
@@ -156,10 +114,14 @@ models:
   - name: fct_document
     description: >
       Document fact table at the document grain. One row per RepairLink document
-      (source TRANSACTION_TRX_DOCUMENT). A transaction can have multiple documents;
-      documents capture order/invoice details, shipping info, and financial totals at
-      the document level. document_parent_id supports document hierarchies (e.g.
-      original + return documents).
+      (source TRANSACTION_TRX_DOCUMENT), sourced from int_repairlink__document.
+      A transaction can have multiple documents. Text normalization (UPPER/TRIM) applied
+      at the intermediate layer on document_no, org keys, and external_id.
+      Columns with 100% null values excluded: document_parent_id, sourcing_type,
+      payment_method_id, all shipping columns (carrier/service/bill/dropoff type IDs,
+      weight, est_value, tracking_no, bill_act_*), amt_doc_shipping/handling,
+      document_event_log_id, external_ird, external_field_4/5, and all lifecycle
+      dates except doc_opened_at.
 
     columns:
       - name: document_id
@@ -167,7 +129,7 @@ models:
         tests: [not_null, unique]
 
       - name: document_no
-        description: Human-readable document number.
+        description: Human-readable document number. Normalized to UPPER(TRIM()).
 
       - name: transaction_id
         description: Foreign key to fct_transaction.
@@ -176,9 +138,6 @@ models:
           - relationships:
               to: ref('fct_transaction')
               field: transaction_id
-
-      - name: document_parent_id
-        description: Parent document identifier for return/correction document hierarchies.
 
       - name: document_type_id
         description: Document type code (e.g. purchase order, invoice, return).
@@ -197,31 +156,19 @@ models:
         description: Numeric status code.
 
       - name: org_key_doc_source
-        description: Org key of the document source party. Join to dim_dealer or dim_shop.
+        description: Org key of the document source party. Normalized to UPPER(TRIM()). Join to dim_dealer or dim_shop.
 
       - name: org_key_doc_target
-        description: Org key of the document target party. Join to dim_dealer or dim_shop.
-
-      - name: sourcing_type
-        description: Sourcing type code for the document.
+        description: Org key of the document target party. Normalized to UPPER(TRIM()). Join to dim_dealer or dim_shop.
 
       - name: manufacturer_id
         description: Manufacturer associated with the document. Join to dim_manufacturer.
 
-      - name: payment_method_id
-        description: Payment method identifier.
-
       - name: amt_doc_subtotal
-        description: Document subtotal before tax, shipping, and handling.
+        description: Document subtotal before tax and adjustment.
 
       - name: amt_doc_tax
         description: Tax amount on the document.
-
-      - name: amt_doc_shipping
-        description: Shipping amount on the document.
-
-      - name: amt_doc_handling
-        description: Handling amount on the document.
 
       - name: amt_doc_adjustment
         description: Adjustment amount on the document.
@@ -235,65 +182,26 @@ models:
       - name: doc_opened_at
         description: Timestamp when the document was opened.
 
-      - name: doc_closed_at
-        description: Timestamp when the document was closed.
+      - name: external_id
+        description: External system identifier. Normalized to UPPER(TRIM()).
 
-      - name: doc_posted_at
-        description: Timestamp when the document was posted.
+      - name: external_xml
+        description: External XML payload. Trimmed.
 
-      - name: doc_voided_at
-        description: Timestamp when the document was voided. Null if not voided.
+      - name: external_field_1
+        description: External integration field 1. Trimmed.
 
-      - name: requested_delivery_at
-        description: Requested delivery timestamp for the order.
+      - name: external_field_2
+        description: External integration field 2. Trimmed.
 
-      - name: ship_at
-        description: Actual shipment timestamp.
+      - name: external_field_3
+        description: External integration field 3. Trimmed.
 
-      - name: ship_delivery_at
-        description: Actual delivery timestamp.
+      - name: created_by
+        description: User (GUID) who created the record.
 
-      - name: ship_expected_at
-        description: Expected delivery timestamp.
-
-      - name: ship_tracking_no
-        description: Carrier tracking number.
-
-      - name: ship_carrier_type_id
-        description: Carrier type identifier (e.g. UPS, FedEx).
-
-      - name: ship_service_type_id
-        description: Carrier service level identifier.
-
-      - name: ship_bill_type_id
-        description: Shipping billing type identifier.
-
-      - name: ship_dropoff_type_id
-        description: Drop-off location type identifier.
-
-      - name: ship_strategy_type_id
-        description: Shipping strategy type. Null — column absent from source table.
-
-      - name: ship_weight
-        description: Shipment weight.
-
-      - name: ship_weight_uom_id
-        description: Unit of measure for ship_weight.
-
-      - name: ship_est_value
-        description: Estimated declared value of the shipment.
-
-      - name: ship_bill_act_shipper
-        description: Actual shipper billing account.
-
-      - name: ship_bill_act_recipient
-        description: Actual recipient billing account.
-
-      - name: ship_bill_act_third_party
-        description: Third-party billing account.
-
-      - name: document_event_log_id
-        description: Event log identifier for audit trail.
+      - name: updated_by
+        description: User (GUID) who last updated the record.
 
       - name: created_at
         description: Record creation timestamp.
@@ -310,10 +218,15 @@ models:
   - name: fct_lineitem
     description: >
       Line item fact table at the line item grain. One row per line item
-      (source TRANSACTION_TRX_LINEITEM). The most granular transaction entity —
-      captures part identity, quantity, full unit and extended pricing across all
-      price types, and shipping/package details. Joins upward to fct_document and
-      fct_partpool; joins to dim_manufacturer for manufacturer context.
+      (source TRANSACTION_TRX_LINEITEM), sourced from int_repairlink__lineitem.
+      The most granular transaction entity — captures part identity, quantity,
+      and unit/extended pricing for the net and final price types. Text normalization
+      (UPPER/TRIM) applied at the intermediate layer on line_item_no, item_name,
+      item_description, part_pool_data_source, and external_id.
+      Columns with 100% null values excluded: qty_available, qty_on_order,
+      amt_unit_base/adjust, all extended prices except amt_ext_net/final,
+      amt_tax, amt_shipping, all package columns, amt_baf_source,
+      line_item_event_log_id, external_ird, external_field_1-5.
 
     columns:
       - name: line_item_id
@@ -321,7 +234,7 @@ models:
         tests: [not_null, unique]
 
       - name: line_item_no
-        description: Human-readable line item number.
+        description: Human-readable line item number. Normalized to UPPER(TRIM()).
 
       - name: line_item_parent_id
         description: Parent line item identifier for hierarchical line item structures.
@@ -354,10 +267,10 @@ models:
         description: Numeric status code.
 
       - name: item_name
-        description: Part name / short description on the line item.
+        description: Part name / short description. Normalized to UPPER(TRIM()).
 
       - name: item_description
-        description: Full part description on the line item.
+        description: Full part description. Normalized to UPPER(TRIM()).
 
       - name: manufacturer_id
         description: Manufacturer identifier. Join to dim_manufacturer.
@@ -368,14 +281,8 @@ models:
       - name: qty
         description: Ordered quantity.
 
-      - name: qty_available
-        description: Quantity available in the supplier's inventory at order time.
-
       - name: qty_on_hand
         description: Quantity on hand at the supplier at order time.
-
-      - name: qty_on_order
-        description: Quantity currently on order at the supplier.
 
       - name: qty_each_per_unit
         description: Number of individual pieces per unit.
@@ -395,35 +302,11 @@ models:
       - name: amt_unit_core
         description: Core charge per unit.
 
-      - name: amt_unit_base
-        description: Base price per unit.
-
       - name: amt_unit_net
         description: Net price per unit after adjustments.
 
       - name: amt_unit_final
         description: Final agreed price per unit.
-
-      - name: amt_unit_adjust
-        description: Per-unit adjustment amount.
-
-      - name: amt_ext_cost
-        description: Extended cost (amt_unit_cost × qty).
-
-      - name: amt_ext_list
-        description: Extended list price (amt_unit_list × qty).
-
-      - name: amt_ext_wholesale
-        description: Extended wholesale price (amt_unit_wholesale × qty).
-
-      - name: amt_ext_trade
-        description: Extended trade price (amt_unit_trade × qty).
-
-      - name: amt_ext_core
-        description: Extended core charge (amt_unit_core × qty).
-
-      - name: amt_ext_base
-        description: Extended base price (amt_unit_base × qty).
 
       - name: amt_ext_net
         description: Extended net price (amt_unit_net × qty).
@@ -431,26 +314,23 @@ models:
       - name: amt_ext_final
         description: Extended final price (amt_unit_final × qty).
 
-      - name: amt_ext_adjust
-        description: Extended adjustment amount (amt_unit_adjust × qty).
-
-      - name: amt_tax
-        description: Tax amount on this line item.
-
-      - name: amt_shipping
-        description: Shipping charge on this line item.
-
       - name: part_pool_data_source
-        description: Data source code that provided the part pool entry.
-
-      - name: amt_baf_source
-        description: BAF (Buyer Adjustment Factor) source amount.
+        description: Data source code that provided the part pool entry. Normalized to UPPER(TRIM()).
 
       - name: part_avail_at
         description: Timestamp when the part will be available.
 
-      - name: line_item_event_log_id
-        description: Event log identifier for audit trail.
+      - name: external_id
+        description: External system identifier. Normalized to UPPER(TRIM()).
+
+      - name: external_xml
+        description: External XML payload. Trimmed.
+
+      - name: created_by
+        description: User (GUID) who created the record.
+
+      - name: updated_by
+        description: User (GUID) who last updated the record.
 
       - name: created_at
         description: Record creation timestamp.
@@ -467,11 +347,15 @@ models:
   - name: fct_partpool
     description: >
       Part pool fact table at the part pool grain. One row per part pool entry
-      (source TRANSACTION_TRX_PARTPOOL). A part pool is the set of available part
-      options presented to the buyer for a given repair need within a transaction.
-      Captures multi-source part numbers, descriptions, and pricing tiers across
-      DLR (dealer), APM (aftermarket), DMS, and EPC data sources. Joins upward to
-      fct_transaction and to dim_manufacturer.
+      (source TRANSACTION_TRX_PARTPOOL), sourced from int_repairlink__partpool.
+      A part pool represents the available part options presented to the buyer for a
+      given repair need within a transaction. Text normalization (UPPER/TRIM) applied
+      at the intermediate layer on part_no, part_description, part_no_apm,
+      part_description_apm/epc, and locale_code.
+      Columns with 100% null values excluded: part_pool_parent_id, all part_usage
+      columns, all base and DLR/DMS/EPC pricing tiers, scrub validation fields,
+      part_no_dlr/dms/epc, part_description_dlr/dms, external_id/ird/field_1-5,
+      and scrub_validated_at. Only APM pricing and EPC description survive.
 
     columns:
       - name: part_pool_id
@@ -486,17 +370,14 @@ models:
               to: ref('fct_transaction')
               field: transaction_id
 
-      - name: part_pool_parent_id
-        description: Parent part pool identifier for hierarchical part pool structures.
-
       - name: part_pool_type_id
         description: Part pool type code.
 
       - name: part_no
-        description: Canonical part number.
+        description: Canonical part number. Normalized to UPPER(TRIM()).
 
       - name: part_description
-        description: Canonical part description.
+        description: Canonical part description. Normalized to UPPER(TRIM()).
 
       - name: manufacturer_id
         description: Manufacturer identifier. Join to dim_manufacturer.
@@ -511,133 +392,40 @@ models:
         description: Numeric status code.
 
       - name: locale_code
-        description: Locale code for the part pool entry.
-
-      - name: part_no_dlr
-        description: Dealer-sourced part number.
+        description: Locale code for the part pool entry. Normalized to UPPER(TRIM()).
 
       - name: part_no_apm
-        description: Aftermarket (APM) part number.
-
-      - name: part_no_dms
-        description: DMS-sourced part number.
-
-      - name: part_no_epc
-        description: EPC-sourced part number.
-
-      - name: part_description_dlr
-        description: Dealer-sourced part description.
+        description: Aftermarket (APM) part number. Normalized to UPPER(TRIM()). DLR/DMS/EPC 100% null in source.
 
       - name: part_description_apm
-        description: Aftermarket (APM) part description.
-
-      - name: part_description_dms
-        description: DMS-sourced part description.
+        description: APM part description. Normalized to UPPER(TRIM()). DLR/DMS 100% null in source.
 
       - name: part_description_epc
-        description: EPC-sourced part description.
-
-      - name: part_usage
-        description: Canonical part usage quantity.
-
-      - name: part_usage_dlr
-        description: Dealer-sourced part usage quantity.
-
-      - name: part_usage_apm
-        description: Aftermarket (APM) part usage quantity.
-
-      - name: part_usage_dms
-        description: DMS-sourced part usage quantity.
-
-      - name: part_usage_epc
-        description: EPC-sourced part usage quantity.
-
-      - name: amt_unit_cost
-        description: Canonical supplier cost per unit.
-
-      - name: amt_unit_list
-        description: Canonical list price per unit.
-
-      - name: amt_unit_wholesale
-        description: Canonical wholesale price per unit.
-
-      - name: amt_unit_trade
-        description: Canonical trade price per unit.
-
-      - name: amt_unit_core
-        description: Canonical core charge per unit.
-
-      - name: amt_unit_cost_dlr
-        description: Dealer-sourced cost per unit.
-
-      - name: amt_unit_list_dlr
-        description: Dealer-sourced list price per unit.
-
-      - name: amt_unit_wholesale_dlr
-        description: Dealer-sourced wholesale price per unit.
-
-      - name: amt_unit_trade_dlr
-        description: Dealer-sourced trade price per unit.
-
-      - name: amt_unit_core_dlr
-        description: Dealer-sourced core charge per unit.
+        description: EPC-sourced part description. Normalized to UPPER(TRIM()). DLR/DMS 100% null in source.
 
       - name: amt_unit_cost_apm
-        description: APM-sourced cost per unit.
+        description: APM cost per unit. All other pricing tiers (base, DLR, DMS, EPC) 100% null in source.
 
       - name: amt_unit_list_apm
-        description: APM-sourced list price per unit.
+        description: APM list price per unit.
 
       - name: amt_unit_wholesale_apm
-        description: APM-sourced wholesale price per unit.
+        description: APM wholesale price per unit.
 
       - name: amt_unit_trade_apm
-        description: APM-sourced trade price per unit.
+        description: APM trade price per unit.
 
       - name: amt_unit_core_apm
-        description: APM-sourced core charge per unit.
+        description: APM core charge per unit.
 
-      - name: amt_unit_cost_dms
-        description: DMS-sourced cost per unit.
+      - name: external_xml
+        description: External XML payload. Trimmed.
 
-      - name: amt_unit_list_dms
-        description: DMS-sourced list price per unit.
+      - name: created_by
+        description: User (GUID) who created the record.
 
-      - name: amt_unit_wholesale_dms
-        description: DMS-sourced wholesale price per unit.
-
-      - name: amt_unit_trade_dms
-        description: DMS-sourced trade price per unit.
-
-      - name: amt_unit_core_dms
-        description: DMS-sourced core charge per unit.
-
-      - name: amt_unit_cost_epc
-        description: EPC-sourced cost per unit.
-
-      - name: amt_unit_list_epc
-        description: EPC-sourced list price per unit.
-
-      - name: amt_unit_wholesale_epc
-        description: EPC-sourced wholesale price per unit.
-
-      - name: amt_unit_trade_epc
-        description: EPC-sourced trade price per unit.
-
-      - name: amt_unit_core_epc
-        description: EPC-sourced core charge per unit.
-
-      - name: is_validate_pass
-        description: Whether the part pool passed the validation check.
-
-      - name: is_scrub_vin_pass
-        description: Whether the part pool passed the VIN scrub check.
-
-      - name: scrub_validated_at
-        description: Timestamp when scrub validation was performed.
-
-      - name: scrub_validity_mask
-        description: Bitmask encoding the specific validation checks that were run.
+      - name: updated_by
+        description: User (GUID) who last updated the record.
 
       - name: created_at
         description: Record creation timestamp.
@@ -655,13 +443,13 @@ models:
     description: >
       PMA (Parts Manufacturer Allowance) line item fact table. One row per
       (line_item_id, program_id) — a line item can qualify for multiple programs,
-      so the composite key is the grain (source PMAPROGRAM_XRF_LINEITEM). Captures
-      the program qualification outcome, reimbursement value, and match messaging
-      for each PMA-qualifying line item. Modeled as a standalone fact, NOT an
+      so the composite key is the grain (source PMAPROGRAM_XRF_LINEITEM), sourced from
+      int_repairlink__pma_lineitem. Text normalization applied at the intermediate layer:
+      program_match_message and program_display_text trimmed (free text, case preserved).
+      Only part_num_oe_xref dropped (100% null). Modeled as a standalone fact, NOT an
       enrichment of fct_lineitem — join coverage is partial in both directions
       (see DAT-2586): only ~10.5% of fct_lineitem rows have a PMA record, and ~73%
-      of PMA records have no matching fct_lineitem row. Always use LEFT joins when
-      bridging between the two.
+      of PMA records have no matching fct_lineitem row. Always use LEFT joins.
 
     tests:
       - dbt_utils.unique_combination_of_columns:
@@ -697,20 +485,23 @@ models:
 
       - name: program_value
         description: >
-          Program reimbursement value. Interpretation varies by program — may be a
-          percentage (e.g. 0.15 = 15%) or a flat amount (e.g. 55.97). Interpret per program_id.
+          Program reimbursement value. May be a percentage (e.g. 0.15 = 15%) or a flat
+          amount (e.g. 55.97). Interpret per program_id.
 
       - name: program_match_message
-        description: Free-text message describing the match condition. Often null.
+        description: Free-text message describing the match condition. Trimmed.
 
       - name: program_display_text
-        description: Customer-facing text describing the reimbursement program and how to claim it.
-
-      - name: part_num_oe_xref
-        description: OE cross-reference part number for the matched part. Often null.
+        description: Customer-facing text describing the reimbursement program and how to claim it. Trimmed.
 
       - name: is_show_columns
         description: UI flag controlling whether program columns are shown. False across observed data.
+
+      - name: created_by
+        description: User (GUID) who created the record.
+
+      - name: updated_by
+        description: User (GUID) who last updated the record.
 
       - name: created_at
         description: Record creation timestamp.

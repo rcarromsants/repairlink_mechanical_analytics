@@ -290,3 +290,338 @@ models:
         description: Record last updated timestamp from source.
       - name: ingested_at
         description: Fivetran sync timestamp.
+
+  - name: int_repairlink__transaction
+    description: >
+      One row per RepairLink transaction (source TRANSACTION_TRX_TRANSACTION).
+      Text normalization applied: org keys, transaction_no, repair_order_number, and external_id
+      normalized to UPPER(TRIM()). Free-text external fields trimmed only.
+      Columns with 100% null values dropped: transaction_parent_id, workflow_id,
+      amt_parts/labor/materials/sublet/deductible, amt_trx_shipping/adjustment,
+      supplement_level, transaction_event_log_id, repair_order_type, claim_number,
+      insurance fields, external_xml, external_ird, and all scheduling/lifecycle
+      timestamps except trx_opened_at.
+    columns:
+      - name: transaction_id
+        description: Primary key. Source TRANSACTIONID.
+        tests: [not_null, unique]
+      - name: transaction_no
+        description: Human-readable transaction number. Normalized to UPPER(TRIM()).
+      - name: transaction_type_id
+        description: Transaction type code.
+        tests: [not_null]
+      - name: transaction_subtype_id
+        description: Transaction sub-type code.
+      - name: transaction_state_id
+        description: Current lifecycle state of the transaction.
+      - name: transaction_substate_id
+        description: Sub-state within the lifecycle state.
+      - name: transmission_type_id
+        description: Transmission type (e.g. EDI, web).
+      - name: status_id
+        description: Numeric status code.
+      - name: org_key_buyer
+        description: Org key of the buying party. Normalized to UPPER(TRIM()). Join to dim_dealer or dim_shop.
+      - name: org_key_seller
+        description: Org key of the selling party. Normalized to UPPER(TRIM()). Join to dim_dealer.
+      - name: org_key_initiator
+        description: Org key of the party that initiated the transaction. Normalized to UPPER(TRIM()).
+      - name: org_key_responder
+        description: Org key of the responding party. Normalized to UPPER(TRIM()).
+      - name: org_key_integrator
+        description: Org key of the integrating party. Normalized to UPPER(TRIM()).
+      - name: amt_trx_subtotal
+        description: Transaction subtotal before tax.
+      - name: amt_trx_tax
+        description: Tax amount on the transaction.
+      - name: amt_trx_total
+        description: Total transaction amount.
+      - name: currency_id
+        description: Currency identifier.
+      - name: trx_opened_at
+        description: Timestamp when the transaction was opened.
+        tests: [not_null]
+      - name: repair_order_number
+        description: External repair order number from the shop DMS. Normalized to UPPER(TRIM()).
+      - name: external_id
+        description: External system identifier. Normalized to UPPER(TRIM()).
+      - name: external_field_1
+        description: External integration field 1. Trimmed.
+      - name: external_field_2
+        description: External integration field 2. Trimmed.
+      - name: external_field_3
+        description: External integration field 3. Trimmed.
+      - name: external_field_4
+        description: External integration field 4. Trimmed.
+      - name: external_field_5
+        description: External integration field 5. Trimmed.
+      - name: created_at
+        description: Record creation timestamp.
+        tests: [not_null]
+      - name: updated_at
+        description: Record last update timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp.
+
+  - name: int_repairlink__document
+    description: >
+      One row per RepairLink document (source TRANSACTION_TRX_DOCUMENT).
+      Text normalization applied: document_no, org keys, external_id normalized to
+      UPPER(TRIM()). External XML and fields trimmed only.
+      Columns with 100% null values dropped: document_parent_id, sourcing_type,
+      payment_method_id, all shipping columns, amt_doc_shipping/handling,
+      document_event_log_id, external_ird, external_field_4/5, and all lifecycle
+      dates except doc_opened_at.
+    columns:
+      - name: document_id
+        description: Primary key. Source DOCUMENTID.
+        tests: [not_null, unique]
+      - name: document_no
+        description: Human-readable document number. Normalized to UPPER(TRIM()).
+      - name: transaction_id
+        description: Foreign key to int_repairlink__transaction.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_repairlink__transaction')
+              field: transaction_id
+      - name: document_type_id
+        description: Document type code.
+        tests: [not_null]
+      - name: document_subtype_id
+        description: Document sub-type code.
+      - name: document_state_id
+        description: Current lifecycle state of the document.
+      - name: document_substate_id
+        description: Sub-state within the lifecycle state.
+      - name: status_id
+        description: Numeric status code.
+      - name: org_key_doc_source
+        description: Org key of the document source party. Normalized to UPPER(TRIM()).
+      - name: org_key_doc_target
+        description: Org key of the document target party. Normalized to UPPER(TRIM()).
+      - name: manufacturer_id
+        description: Manufacturer associated with the document. Join to dim_manufacturer.
+      - name: amt_doc_subtotal
+        description: Document subtotal before tax.
+      - name: amt_doc_tax
+        description: Tax amount on the document.
+      - name: amt_doc_core_total
+        description: Core charge total on the document.
+      - name: amt_doc_total
+        description: Total document amount.
+      - name: doc_opened_at
+        description: Timestamp when the document was opened.
+      - name: external_id
+        description: External system identifier. Normalized to UPPER(TRIM()).
+      - name: external_xml
+        description: External XML payload. Trimmed.
+      - name: external_field_1
+        description: External integration field 1. Trimmed.
+      - name: external_field_2
+        description: External integration field 2. Trimmed.
+      - name: external_field_3
+        description: External integration field 3. Trimmed.
+      - name: created_at
+        description: Record creation timestamp.
+        tests: [not_null]
+      - name: updated_at
+        description: Record last update timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp.
+
+  - name: int_repairlink__lineitem
+    description: >
+      One row per RepairLink line item (source TRANSACTION_TRX_LINEITEM).
+      Text normalization applied: line_item_no, item_name, item_description,
+      part_pool_data_source, and external_id normalized to UPPER(TRIM()).
+      External XML trimmed only.
+      Columns with 100% null values dropped: qty_available, qty_on_order,
+      amt_unit_base/adjust, all extended price columns except amt_ext_net/final,
+      amt_tax, amt_shipping, all package columns, amt_baf_source,
+      line_item_event_log_id, external_ird, external_field_1-5.
+    columns:
+      - name: line_item_id
+        description: Primary key. Source LINEITEMID.
+        tests: [not_null, unique]
+      - name: line_item_no
+        description: Human-readable line item number. Normalized to UPPER(TRIM()).
+      - name: line_item_parent_id
+        description: Parent line item identifier for hierarchical structures.
+      - name: document_id
+        description: Foreign key to int_repairlink__document.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_repairlink__document')
+              field: document_id
+      - name: part_pool_id
+        description: Foreign key to int_repairlink__partpool.
+        tests: [not_null]
+      - name: line_item_type_id
+        description: Line item type code.
+      - name: line_item_sort
+        description: Sort order for display within the document.
+      - name: line_item_state_id
+        description: Current lifecycle state of the line item.
+      - name: line_item_substate_id
+        description: Sub-state within the lifecycle state.
+      - name: status_id
+        description: Numeric status code.
+      - name: item_name
+        description: Part name / short description. Normalized to UPPER(TRIM()).
+      - name: item_description
+        description: Full part description. Normalized to UPPER(TRIM()).
+      - name: manufacturer_id
+        description: Manufacturer identifier. Join to dim_manufacturer.
+      - name: unit_of_measure_id
+        description: Unit of measure for quantity.
+      - name: qty
+        description: Ordered quantity.
+      - name: qty_on_hand
+        description: Quantity on hand at the supplier at order time.
+      - name: qty_each_per_unit
+        description: Number of individual pieces per unit.
+      - name: amt_unit_cost
+        description: Supplier cost per unit.
+      - name: amt_unit_list
+        description: List (MSRP) price per unit.
+      - name: amt_unit_wholesale
+        description: Wholesale price per unit.
+      - name: amt_unit_trade
+        description: Trade price per unit.
+      - name: amt_unit_core
+        description: Core charge per unit.
+      - name: amt_unit_net
+        description: Net price per unit after adjustments.
+      - name: amt_unit_final
+        description: Final agreed price per unit.
+      - name: amt_ext_net
+        description: Extended net price (amt_unit_net × qty).
+      - name: amt_ext_final
+        description: Extended final price (amt_unit_final × qty).
+      - name: part_pool_data_source
+        description: Data source code for the part pool entry. Normalized to UPPER(TRIM()).
+      - name: part_avail_at
+        description: Timestamp when the part will be available.
+      - name: external_id
+        description: External system identifier. Normalized to UPPER(TRIM()).
+      - name: external_xml
+        description: External XML payload. Trimmed.
+      - name: created_at
+        description: Record creation timestamp.
+        tests: [not_null]
+      - name: updated_at
+        description: Record last update timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp.
+
+  - name: int_repairlink__partpool
+    description: >
+      One row per RepairLink part pool entry (source TRANSACTION_TRX_PARTPOOL).
+      Text normalization applied: part_no, part_description, part_no_apm,
+      part_description_apm/epc, and locale_code normalized to UPPER(TRIM()).
+      External XML trimmed only.
+      Columns with 100% null values dropped: part_pool_parent_id, all part_usage
+      columns, base and DLR/DMS/EPC pricing tiers, scrub validation fields,
+      part_no_dlr/dms/epc, part_description_dlr/dms, external_id/ird/field_1-5,
+      and scrub_validated_at. Only APM pricing and EPC description survive.
+    columns:
+      - name: part_pool_id
+        description: Primary key. Source PARTPOOLID.
+        tests: [not_null, unique]
+      - name: transaction_id
+        description: Foreign key to int_repairlink__transaction.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_repairlink__transaction')
+              field: transaction_id
+      - name: part_pool_type_id
+        description: Part pool type code.
+      - name: part_no
+        description: Canonical part number. Normalized to UPPER(TRIM()).
+      - name: part_description
+        description: Canonical part description. Normalized to UPPER(TRIM()).
+      - name: manufacturer_id
+        description: Manufacturer identifier. Join to dim_manufacturer.
+      - name: part_type_external_id
+        description: External part type classification identifier.
+      - name: part_type_internal_id
+        description: Internal part type classification identifier.
+      - name: status_id
+        description: Numeric status code.
+      - name: locale_code
+        description: Locale code for the part pool entry. Normalized to UPPER(TRIM()).
+      - name: part_no_apm
+        description: Aftermarket (APM) part number. Normalized to UPPER(TRIM()).
+      - name: part_description_apm
+        description: APM part description. Normalized to UPPER(TRIM()).
+      - name: part_description_epc
+        description: EPC-sourced part description. Normalized to UPPER(TRIM()).
+      - name: amt_unit_cost_apm
+        description: APM cost per unit.
+      - name: amt_unit_list_apm
+        description: APM list price per unit.
+      - name: amt_unit_wholesale_apm
+        description: APM wholesale price per unit.
+      - name: amt_unit_trade_apm
+        description: APM trade price per unit.
+      - name: amt_unit_core_apm
+        description: APM core charge per unit.
+      - name: external_xml
+        description: External XML payload. Trimmed.
+      - name: created_at
+        description: Record creation timestamp.
+        tests: [not_null]
+      - name: updated_at
+        description: Record last update timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp.
+
+  - name: int_repairlink__pma_lineitem
+    description: >
+      One row per (line_item_id, program_id) PMA cross-reference record
+      (source PMAPROGRAM_XRF_LINEITEM). Text normalization applied: program_match_message
+      and program_display_text trimmed (free text, case preserved).
+      Only part_num_oe_xref dropped (100% null). See DAT-2586 for coverage notes —
+      ~73% of PMA records have no matching int_repairlink__lineitem row; always LEFT join.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - line_item_id
+            - program_id
+    columns:
+      - name: line_item_id
+        description: Part of composite PK. Optional FK to int_repairlink__lineitem (LEFT join only).
+        tests: [not_null]
+      - name: program_id
+        description: Part of composite PK. PMA reimbursement program identifier.
+        tests: [not_null]
+      - name: transaction_id
+        description: Foreign key to int_repairlink__transaction.
+      - name: comparison_result_id
+        description: Comparison result that produced the program match. Sparsely populated.
+      - name: qualification_type_id
+        description: Qualification type applied when matching the line item to the program.
+      - name: qualification_status_id
+        description: Qualification outcome status. Sparsely populated.
+      - name: status_id
+        description: Numeric status code. Observed as 1 across all current data.
+      - name: program_value
+        description: >
+          Program reimbursement value. May be a percentage (e.g. 0.15 = 15%) or a flat
+          amount (e.g. 55.97). Interpret per program_id.
+      - name: program_match_message
+        description: Free-text message describing the match condition. Trimmed.
+      - name: program_display_text
+        description: Customer-facing text describing the reimbursement program. Trimmed.
+      - name: is_show_columns
+        description: UI flag controlling whether program columns are shown.
+      - name: created_at
+        description: Record creation timestamp.
+        tests: [not_null]
+      - name: updated_at
+        description: Record last update timestamp.
+      - name: ingested_at
+        description: Fivetran sync timestamp.

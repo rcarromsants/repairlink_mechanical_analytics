@@ -1,5 +1,9 @@
 {{ config(materialized='table') }}
 
+with source as (
+    select * from {{ ref('stg_repairlink__pma_lineitem') }}
+)
+
 select
     -- identity (composite PK: line_item_id + program_id)
     line_item_id,
@@ -14,8 +18,8 @@ select
 
     -- program detail
     program_value,
-    program_match_message,
-    program_display_text,
+    trim(program_match_message)             as program_match_message,
+    trim(program_display_text)              as program_display_text,
     is_show_columns,
 
     -- metadata
@@ -25,4 +29,4 @@ select
     updated_at,
     ingested_at
 
-from {{ ref('int_repairlink__pma_lineitem') }}
+from source
