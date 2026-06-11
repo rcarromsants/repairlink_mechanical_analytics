@@ -917,9 +917,10 @@ models:
       line items no longer present in TRANSACTION_TRX_LINEITEM (see DAT-2586).
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - line_item_id
-            - program_id
+          arguments:
+            combination_of_columns:
+              - line_item_id
+              - program_id
     columns:
       - name: line_item_id
         description: >
