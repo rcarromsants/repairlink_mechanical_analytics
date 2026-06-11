@@ -37,9 +37,9 @@ select
     -- external integration
     upper(trim(external_id))                as external_id,
     trim(external_xml)                      as external_xml,
-    trim(external_field_1)                  as external_field_1,
-    trim(external_field_2)                  as external_field_2,
-    trim(external_field_3)                  as external_field_3,
+    upper(trim(external_field_1))           as external_field_1,
+    upper(trim(external_field_2))           as external_field_2,
+    upper(trim(external_field_3))           as external_field_3,
 
     -- metadata
     created_by,
