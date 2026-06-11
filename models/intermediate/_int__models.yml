@@ -290,3 +290,348 @@ models:
         description: Record last updated timestamp from source.
       - name: ingested_at
         description: Fivetran sync timestamp.
+
+  - name: int_repairlink__transactions
+    description: >
+      Core transaction spine filtered to RepairLink products only (transaction_subtype_id IN 105=RLK, 110=RLM).
+      Grain: one row per transaction. Incremental merge on transaction_id.
+      All downstream RepairLink models reference this as their base universe.
+    columns:
+      - name: transaction_id
+        description: Surrogate primary key from stg_repairlink__transaction.
+        tests: [not_null, unique]
+      - name: transaction_no
+        description: Human-readable transaction number displayed in the RepairLink UI.
+      - name: transaction_type_id
+        description: Numeric FK to transaction type (100=PURCHASE, 200=SALE, 300=CLAIM).
+      - name: transaction_type
+        description: Decoded transaction type name from stg_repairlink__transaction_type.
+      - name: transaction_subtype_id
+        description: Numeric FK to transaction subtype. Only 105 (RLK) and 110 (RLM) pass the model filter.
+      - name: transaction_subtype
+        description: Decoded transaction subtype name (REPAIR_LINK or REPAIR_LINK_MORE).
+      - name: transaction_subtype_code
+        description: Short code for the transaction subtype.
+      - name: transaction_state_id
+        description: Numeric FK to transaction state (100=OPEN, 200=CLOSED, 300=VOID).
+      - name: transaction_state
+        description: Decoded transaction state name from stg_repairlink__transaction_state.
+      - name: transaction_substate_id
+        description: Numeric FK to transaction substate (NEW, SUBMITTED, RECEIVED, COMPLETED, CANCELED, etc.).
+      - name: transaction_substate
+        description: Decoded transaction substate name from stg_repairlink__transaction_substate.
+      - name: org_key_buyer
+        description: Org key for the buying shop. Format XXX-XXX-XXX-000 (15 chars).
+      - name: org_key_seller
+        description: Org key for the selling supplier. Format XXX-XXX-XXX-000 (15 chars).
+      - name: org_key_initiator
+        description: Org key of the party who initiated the transaction.
+      - name: org_key_responder
+        description: Org key of the party who responded to the transaction.
+      - name: repair_order_number
+        description: Repair order number from the shop management system (EMS-level reference).
+      - name: claim_number
+        description: Claim number for claim-type transactions (CLAIM subtype only).
+      - name: amt_parts
+        description: Total parts amount at transaction level.
+      - name: amt_labor
+        description: Total labor amount at transaction level.
+      - name: amt_materials
+        description: Total materials amount at transaction level.
+      - name: amt_sublet
+        description: Total sublet amount at transaction level.
+      - name: amt_trx_subtotal
+        description: Transaction subtotal before adjustments, shipping, and tax.
+      - name: amt_trx_adjustment
+        description: Transaction-level price adjustment (may be negative).
+      - name: amt_trx_shipping
+        description: Transaction-level shipping charge.
+      - name: amt_trx_tax
+        description: Transaction-level tax amount.
+      - name: amt_trx_total
+        description: Final transaction total including all components.
+      - name: trx_opened_at
+        description: Timestamp when the transaction was opened.
+      - name: trx_closed_at
+        description: Timestamp when the transaction was closed. Null for open transactions.
+      - name: trx_voided_at
+        description: Timestamp when the transaction was voided. Null for non-void transactions.
+      - name: trx_posted_at
+        description: Timestamp when the transaction was posted (accounting finalized).
+      - name: created_at
+        description: Record creation timestamp from source.
+      - name: updated_at
+        description: Record last updated timestamp. Used as the incremental filter watermark.
+
+  - name: int_repairlink__documents
+    description: >
+      Documents (purchase orders, invoices, shipments, worksheets) joined with decoded type/state lookups.
+      Grain: one row per document. Scoped to RepairLink transactions via INNER JOIN to int_repairlink__transactions.
+      Incremental merge on document_id.
+    columns:
+      - name: document_id
+        description: Surrogate primary key from stg_repairlink__document.
+        tests: [not_null, unique]
+      - name: transaction_id
+        description: Foreign key to int_repairlink__transactions.transaction_id.
+      - name: document_no
+        description: Human-readable document number displayed in the RepairLink UI.
+      - name: document_type_id
+        description: Numeric FK to document type (100=PRELIMINARY, 200=CONTRACTUAL, 300=FINALIZED, 400=MISC).
+      - name: document_type
+        description: Decoded document type name from stg_repairlink__document_type.
+      - name: document_subtype_id
+        description: Numeric FK to document subtype (REQUEST_QUOTE, PURCHASE_ORDER, INVOICE, SHIPMENT, etc.).
+      - name: document_subtype
+        description: Decoded document subtype name from stg_repairlink__document_subtype.
+      - name: document_subtype_code
+        description: Short code for the document subtype.
+      - name: document_state_id
+        description: Numeric FK to document state (100=OPEN, 200=CLOSED, 300=VOID).
+      - name: document_state
+        description: Decoded document state name from stg_repairlink__document_state.
+      - name: document_substate_id
+        description: Numeric FK to document substate.
+      - name: document_substate
+        description: Decoded document substate name from stg_repairlink__document_substate.
+      - name: org_key_doc_source
+        description: Org key of the party who created the document (source).
+      - name: org_key_doc_target
+        description: Org key of the party receiving the document (target).
+      - name: payment_method_id
+        description: Numeric FK to payment method (COD, BILLEXISTINGACCOUNT, CREDITCARD, etc.).
+      - name: payment_method
+        description: Decoded payment method name from stg_repairlink__payment_method.
+      - name: manufacturer_id
+        description: Manufacturer associated with this document (nullable).
+      - name: amt_doc_subtotal
+        description: Document subtotal before adjustments, shipping, handling, and tax.
+      - name: amt_doc_adjustment
+        description: Document-level price adjustment (may be negative).
+      - name: amt_doc_shipping
+        description: Shipping charge at document level.
+      - name: amt_doc_handling
+        description: Handling charge at document level.
+      - name: amt_doc_core_total
+        description: Core charge total at document level (refundable core deposits on parts).
+      - name: amt_doc_tax
+        description: Tax amount at document level.
+      - name: amt_doc_total
+        description: Final document total including all components.
+      - name: ship_at
+        description: Timestamp when the document was shipped.
+      - name: ship_delivery_at
+        description: Expected or actual delivery timestamp.
+      - name: ship_tracking_no
+        description: Carrier tracking number for the shipment.
+      - name: doc_opened_at
+        description: Timestamp when the document was opened.
+      - name: doc_closed_at
+        description: Timestamp when the document was closed. Null for open documents.
+      - name: doc_voided_at
+        description: Timestamp when the document was voided. Null for non-void documents.
+      - name: doc_posted_at
+        description: Timestamp when the document was posted (accounting finalized).
+      - name: created_at
+        description: Record creation timestamp from source.
+      - name: updated_at
+        description: Record last updated timestamp. Used as the incremental filter watermark.
+
+  - name: int_repairlink__line_items
+    description: >
+      Part-level line item detail joined with pricing from the part pool and decoded type/state lookups.
+      Grain: one row per line item. Scoped to RepairLink documents via INNER JOIN to int_repairlink__documents.
+      Incremental merge on line_item_id.
+    columns:
+      - name: line_item_id
+        description: Surrogate primary key from stg_repairlink__lineitem.
+        tests: [not_null, unique]
+      - name: document_id
+        description: Foreign key to int_repairlink__documents.document_id.
+      - name: transaction_id
+        description: Foreign key to int_repairlink__transactions.transaction_id (carried through from document).
+      - name: line_item_parent_id
+        description: Self-referential FK for bundle/package hierarchies (child → parent).
+      - name: line_item_type_id
+        description: Numeric FK to line item type (100=SERVICE, 101=LABOR, 102=PART, 103=MATERIAL, 104=BUNDLE, 200=PACKAGE).
+      - name: line_item_type
+        description: Decoded line item type name from stg_repairlink__lineitem_type.
+      - name: line_item_state_id
+        description: Numeric FK to line item state (100=OPEN, 200=CLOSED, 300=VOID).
+      - name: line_item_state
+        description: Decoded line item state name from stg_repairlink__lineitem_state.
+      - name: line_item_substate_id
+        description: Numeric FK to line item substate (SHIPPED, INVOICED, QUOTED, NOT_AVAILABLE, BACKORDERED, etc.).
+      - name: line_item_substate
+        description: Decoded line item substate name from stg_repairlink__lineitem_substate.
+      - name: item_name
+        description: Short name or label for the line item.
+      - name: item_description
+        description: Full description of the line item.
+      - name: line_item_no
+        description: Sequential line item number within the document.
+      - name: part_pool_id
+        description: Foreign key to stg_repairlink__partpool (the specific part being quoted/ordered).
+      - name: part_no
+        description: Part number from the part pool.
+      - name: part_description
+        description: Description of the part from the part pool.
+      - name: manufacturer_id
+        description: Manufacturer associated with the part pool entry.
+      - name: part_pool_type_id
+        description: Numeric FK to part pool type (100=REQUESTED, 101=ALTERNATE, 102=EQUIVALENT, 103=RELATED).
+      - name: part_pool_type
+        description: Decoded part pool type name from stg_repairlink__partpool_type.
+      - name: qty
+        description: Quantity ordered.
+      - name: qty_available
+        description: Quantity available in seller inventory at time of quote.
+      - name: qty_on_hand
+        description: Quantity on hand at seller location.
+      - name: qty_on_order
+        description: Quantity on order (incoming stock) at seller location.
+      - name: amt_unit_list
+        description: Manufacturer list price per unit.
+      - name: amt_unit_cost
+        description: Seller's cost per unit.
+      - name: amt_unit_net
+        description: Net price per unit after program discounts.
+      - name: amt_unit_final
+        description: Final price per unit charged to buyer.
+      - name: amt_unit_adjust
+        description: Unit-level price adjustment.
+      - name: amt_unit_core
+        description: Core charge per unit (refundable deposit on returnable cores).
+      - name: amt_ext_final
+        description: Extended final amount (amt_unit_final * qty).
+      - name: amt_ext_list
+        description: Extended list amount (amt_unit_list * qty).
+      - name: amt_ext_cost
+        description: Extended cost amount (amt_unit_cost * qty).
+      - name: amt_ext_net
+        description: Extended net amount (amt_unit_net * qty).
+      - name: amt_ext_adjust
+        description: Extended price adjustment (amt_unit_adjust * qty).
+      - name: amt_ext_core
+        description: Extended core charge (amt_unit_core * qty).
+      - name: amt_tax
+        description: Tax amount for this line item.
+      - name: amt_shipping
+        description: Shipping charge for this line item.
+      - name: part_avail_at
+        description: Timestamp when part availability was confirmed.
+      - name: created_at
+        description: Record creation timestamp from source.
+      - name: updated_at
+        description: Record last updated timestamp. Used as the incremental filter watermark.
+
+  - name: int_repairlink__shop_activity
+    description: >
+      Shop activity spine — one row per enrolled shop. Uses dim_shop as the enrolled universe,
+      then left-joins transaction KPIs, first estimate date, and first order date.
+      Materialized as a table (not incremental) because min/max KPIs must be recalculated over all history.
+      enrollment_date and days_to_first_transaction are NULL placeholders pending CRM data.
+    columns:
+      - name: shop_org_key
+        description: >
+          Buyer org key derived as dim_shop.shop_id || '-000'. Matches the org_key_buyer
+          format in int_repairlink__transactions.
+        tests: [not_null, unique]
+      - name: shop_name
+        description: Shop display name from dim_shop.
+      - name: address_line_1
+        description: Primary shop address line.
+      - name: address_line_2
+        description: Secondary shop address line.
+      - name: city
+        description: Shop city.
+      - name: state
+        description: Shop state or province code.
+      - name: postal_code
+        description: Shop postal / ZIP code.
+      - name: country
+        description: ISO 3166-1 alpha-2 country code (source COUNTRYCODE).
+      - name: latitude
+        description: Geographic latitude.
+      - name: longitude
+        description: Geographic longitude.
+      - name: phone
+        description: Shop business phone (source PHONEBUSINESS).
+      - name: email
+        description: Shop contact email.
+      - name: enrollment_date
+        description: >
+          PLACEHOLDER — always null. Will hold the date the shop enrolled in RepairLink once
+          CRM data is available. Required for days_to_first_transaction calculation.
+      - name: shop_first_estimate
+        description: >
+          Date of the shop's first WORKSHEET document (subtype_id=404, state != VOID).
+          Excludes self-referencing documents (source = target).
+      - name: shop_first_order
+        description: >
+          Date of the shop's first PURCHASE_ORDER document (subtype_id=201, state != VOID).
+          Represents the value moment — first real ordering activity.
+      - name: first_transaction_date
+        description: Date of the shop's first non-void transaction.
+      - name: last_transaction_date
+        description: Date of the shop's most recent non-void transaction.
+      - name: total_transactions
+        description: Count of non-void transactions for the shop. Defaults to 0 for enrolled shops with no transactions.
+      - name: days_to_first_transaction
+        description: >
+          PLACEHOLDER — always null. Will hold datediff(enrollment_date, shop_first_order)
+          once enrollment_date is populated from CRM.
+
+  - name: int_repairlink__suppliers
+    description: >
+      Supplier dimension with contact details, dealer/OEM mapping, and transaction KPIs.
+      Grain: one row per supplier org key (branch level). Materialized as a table (not incremental)
+      because min/max KPIs must be recalculated over all history.
+      supplier_parent_key normalizes the branch-level org_key to the transaction-level key
+      (suffix -000) used in int_repairlink__transactions.org_key_seller.
+    columns:
+      - name: supplier_org_key
+        description: >
+          Branch-level supplier org key from stg_repairlink__contact (contact_type_id=101 SOLD_BY).
+          Format: XXX-XXX-XXX-XXX (15 chars, last segment = location code).
+        tests: [not_null, unique]
+      - name: supplier_parent_key
+        description: >
+          Transaction-level key derived as left(org_key, 11) || '-000'. Matches org_key_seller
+          in int_repairlink__transactions. Used for all KPI and mapping joins.
+      - name: supplier_name
+        description: Supplier display name from the most recent SOLD_BY contact record.
+      - name: address_line_1
+        description: Primary supplier address line.
+      - name: address_line_2
+        description: Secondary supplier address line.
+      - name: city
+        description: Supplier city.
+      - name: state
+        description: Supplier state or province code.
+      - name: postal_code
+        description: Supplier postal / ZIP code.
+      - name: country
+        description: ISO 3166-1 alpha-2 country code (source COUNTRYCODE).
+      - name: latitude
+        description: Geographic latitude.
+      - name: longitude
+        description: Geographic longitude.
+      - name: phone
+        description: Supplier business phone (source PHONEBUSINESS).
+      - name: email
+        description: Supplier contact email.
+      - name: dealer_id
+        description: Dealer identifier from stg_repairlink__dealer_mapper (mapped via supplier_parent_key).
+      - name: group_id
+        description: Dealer group identifier from stg_repairlink__dealer_mapper.
+      - name: distance_km
+        description: Distance in kilometers from dealer mapper (meaning depends on mapper configuration).
+      - name: supplier_number
+        description: Internal supplier number from stg_repairlink__suppliermapper.
+      - name: first_transaction_date
+        description: Date of the supplier's first non-void RepairLink transaction.
+      - name: last_transaction_date
+        description: Date of the supplier's most recent non-void RepairLink transaction.
+      - name: total_transactions
+        description: Count of non-void transactions for the supplier. Defaults to 0 for suppliers with no transactions.

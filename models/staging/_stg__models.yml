@@ -959,3 +959,345 @@ models:
         description: Record last updated timestamp (source UPDATEDON).
       - name: ingested_at
         description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__document_type
+    description: Lookup table for document type codes (PRELIMINARY, CONTRACTUAL, FINALIZED, MISC).
+    columns:
+      - name: document_type_id
+        description: Primary key for the document type (source DOCUMENTTYPEID).
+        tests: [not_null, unique]
+      - name: document_type_name
+        description: Business key for the document type (source DOCUMENTTYPEKEY).
+      - name: document_type_dt_id
+        description: Display text identifier for the document type.
+      - name: framework_class
+        description: Framework class name used internally by the RepairLink application.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__document_subtype
+    description: >
+      Lookup table for document subtype codes (REQUEST_QUOTE, PURCHASE_ORDER, INVOICE, SHIPMENT, etc.).
+      Subtypes belong to a parent document type via document_type_id.
+    columns:
+      - name: document_subtype_id
+        description: Primary key for the document subtype (source DOCUMENTSUBTYPEID).
+        tests: [not_null, unique]
+      - name: document_type_id
+        description: Foreign key to stg_repairlink__document_type.document_type_id.
+      - name: document_subtype_name
+        description: Business key for the document subtype (source DOCUMENTSUBTYPEKEY).
+      - name: document_subtype_code
+        description: Short code for the document subtype (source DOCUMENTSUBTYPECODE).
+      - name: document_subtype_dt_id
+        description: Display text identifier for the document subtype.
+      - name: framework_class
+        description: Framework class name used internally by the RepairLink application.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__document_state
+    description: Lookup table for document state codes (OPEN=100, CLOSED=200, VOID=300).
+    columns:
+      - name: document_state_id
+        description: Primary key for the document state (source DOCUMENTSTATEID).
+        tests: [not_null, unique]
+      - name: document_state_name
+        description: Business key for the document state (source DOCUMENTSTATEKEY).
+      - name: document_state_dt_id
+        description: Display text identifier for the document state.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__document_substate
+    description: >
+      Lookup table for document substate codes. Substates belong to a parent document state
+      via document_state_id and require both IDs for a correct lookup.
+    columns:
+      - name: document_substate_id
+        description: Primary key for the document substate (source DOCUMENTSUBSTATEID).
+        tests: [not_null, unique]
+      - name: document_state_id
+        description: Foreign key to stg_repairlink__document_state.document_state_id.
+      - name: document_substate_name
+        description: Business key for the document substate (source DOCUMENTSUBSTATEKEY).
+      - name: document_substate_dt_id
+        description: Display text identifier for the document substate.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__payment_method
+    description: Lookup table for payment method codes (COD, BILLEXISTINGACCOUNT, CREDITCARD, etc.).
+    columns:
+      - name: payment_method_id
+        description: Primary key for the payment method (source PAYMENTMETHODID).
+        tests: [not_null, unique]
+      - name: payment_method_name
+        description: Business key for the payment method (source PAYMENTMETHODKEY).
+      - name: payment_method_dt_id
+        description: Display text identifier for the payment method.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: updated_at
+        description: Record last updated timestamp (source UPDATEDON).
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__transaction_type
+    description: Lookup table for transaction type codes (PURCHASE=100, SALE=200, CLAIM=300).
+    columns:
+      - name: transaction_type_id
+        description: Primary key for the transaction type (source TRANSACTIONTYPEID).
+        tests: [not_null, unique]
+      - name: transaction_type_name
+        description: Business key for the transaction type (source TRANSACTIONTYPEKEY).
+      - name: transaction_type_dt_id
+        description: Display text identifier for the transaction type.
+      - name: framework_class
+        description: Framework class name used internally by the RepairLink application.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__transaction_subtype
+    description: >
+      Lookup table for transaction subtype codes. Key values: REPAIR_LINK=105 (classic RLK),
+      REPAIR_LINK_MORE=110 (current RLM). Subtypes belong to a parent transaction type via transaction_type_id.
+    columns:
+      - name: transaction_subtype_id
+        description: Primary key for the transaction subtype (source TRANSACTIONSUBTYPEID).
+        tests: [not_null, unique]
+      - name: transaction_type_id
+        description: Foreign key to stg_repairlink__transaction_type.transaction_type_id.
+      - name: transaction_subtype_name
+        description: Business key for the transaction subtype (source TRANSACTIONSUBTYPEKEY).
+      - name: transaction_subtype_code
+        description: Short code for the transaction subtype (source TRANSACTIONSUBTYPECODE).
+      - name: transaction_subtype_dt_id
+        description: Display text identifier for the transaction subtype.
+      - name: framework_class
+        description: Framework class name used internally by the RepairLink application.
+      - name: framework_class_overview
+        description: Overview framework class name (source FRAMEWORKCLASSOVERVIEW).
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__transaction_state
+    description: Lookup table for transaction state codes (OPEN=100, CLOSED=200, VOID=300).
+    columns:
+      - name: transaction_state_id
+        description: Primary key for the transaction state (source TRANSACTIONSTATEID).
+        tests: [not_null, unique]
+      - name: transaction_state_name
+        description: Business key for the transaction state (source TRANSACTIONSTATEKEY).
+      - name: transaction_state_dt_id
+        description: Display text identifier for the transaction state.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__transaction_substate
+    description: >
+      Lookup table for transaction substate codes (NEW, SUBMITTED, RECEIVED, COMPLETED, CANCELED, etc.).
+      Substates belong to a parent transaction state via transaction_state_id.
+    columns:
+      - name: transaction_substate_id
+        description: Primary key for the transaction substate (source TRANSACTIONSUBSTATEID).
+        tests: [not_null, unique]
+      - name: transaction_state_id
+        description: Foreign key to stg_repairlink__transaction_state.transaction_state_id.
+      - name: transaction_substate_name
+        description: Business key for the transaction substate (source TRANSACTIONSUBSTATEKEY).
+      - name: transaction_substate_dt_id
+        description: Display text identifier for the transaction substate.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__lineitem_type
+    description: >
+      Lookup table for line item type codes (SERVICE=100, LABOR=101, PART=102,
+      MATERIAL=103, BUNDLE=104, PACKAGE=200).
+    columns:
+      - name: line_item_type_id
+        description: Primary key for the line item type (source LINEITEMTYPEID).
+        tests: [not_null, unique]
+      - name: line_item_type_name
+        description: Business key for the line item type (source LINEITEMTYPEKEY).
+      - name: line_item_type_dt_id
+        description: Display text identifier for the line item type.
+      - name: framework_class
+        description: Framework class name used internally by the RepairLink application.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__lineitem_state
+    description: Lookup table for line item state codes (OPEN=100, CLOSED=200, VOID=300).
+    columns:
+      - name: line_item_state_id
+        description: Primary key for the line item state (source LINEITEMSTATEID).
+        tests: [not_null, unique]
+      - name: line_item_state_name
+        description: Business key for the line item state (source LINEITEMSTATEKEY).
+      - name: line_item_state_dt_id
+        description: Display text identifier for the line item state.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__lineitem_substate
+    description: >
+      Lookup table for line item substate codes (SHIPPED, INVOICED, QUOTED, NOT_AVAILABLE, BACKORDERED, etc.).
+      Substates belong to a parent line item state via line_item_state_id.
+    columns:
+      - name: line_item_substate_id
+        description: Primary key for the line item substate (source LINEITEMSUBSTATEID).
+        tests: [not_null, unique]
+      - name: line_item_state_id
+        description: Foreign key to stg_repairlink__lineitem_state.line_item_state_id.
+      - name: line_item_substate_name
+        description: Business key for the line item substate (source LINEITEMSUBSTATEKEY).
+      - name: line_item_substate_dt_id
+        description: Display text identifier for the line item substate.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.
+
+  - name: stg_repairlink__partpool_type
+    description: >
+      Lookup table for part pool type codes (REQUESTED=100, ALTERNATE=101, EQUIVALENT=102, RELATED=103).
+    columns:
+      - name: part_pool_type_id
+        description: Primary key for the part pool type (source PARTPOOLTYPEID).
+        tests: [not_null, unique]
+      - name: part_pool_type_name
+        description: Business key for the part pool type (source PARTPOOLTYPEKEY).
+      - name: part_pool_type_dt_id
+        description: Display text identifier for the part pool type.
+      - name: framework_class
+        description: Framework class name used internally by the RepairLink application.
+      - name: status_id
+        description: Numeric status code for the record.
+      - name: sort_order
+        description: Display sort order.
+      - name: description_dt_id
+        description: Display text identifier for the description.
+      - name: remark
+        description: Free-text remark.
+      - name: is_deleted
+        description: Fivetran soft-delete flag (source _FIVETRAN_DELETED).
+      - name: ingested_at
+        description: Fivetran sync timestamp used for incremental processing.

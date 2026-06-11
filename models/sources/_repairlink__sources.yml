@@ -61,6 +61,40 @@ sources:
         description: >
           OEM enrollment records per dealer. Enriches dim_dealer with OEM relationship data.
       
+      ################### Line Item & Part Pool Enum Lookup Tables ####################
+      - name: TRANSACTION_ENU_LINEITEMTYPE
+        description: >
+          Lookup table for line item type codes (SERVICE, LABOR, PART, MATERIAL, BUNDLE, PACKAGE).
+
+      - name: TRANSACTION_ENU_LINEITEMSTATE
+        description: >
+          Lookup table for line item state codes (OPEN, CLOSED, VOID).
+
+      - name: TRANSACTION_ENU_LINEITEMSUBSTATE
+        description: >
+          Lookup table for line item substate codes (SHIPPED, INVOICED, QUOTED, NOT_AVAILABLE, BACKORDERED, etc.).
+
+      - name: TRANSACTION_ENU_PARTPOOLTYPE
+        description: >
+          Lookup table for part pool type codes (REQUESTED, ALTERNATE, EQUIVALENT, RELATED).
+
+      ################### Transaction Enum Lookup Tables ####################
+      - name: TRANSACTION_ENU_TRANSACTIONTYPE
+        description: >
+          Lookup table for transaction type codes (PURCHASE, SALE, CLAIM).
+
+      - name: TRANSACTION_ENU_TRANSACTIONSUBTYPE
+        description: >
+          Lookup table for transaction subtype codes (REPAIR_LINK=105, REPAIR_LINK_MORE=110, etc.).
+
+      - name: TRANSACTION_ENU_TRANSACTIONSTATE
+        description: >
+          Lookup table for transaction state codes (OPEN, CLOSED, VOID).
+
+      - name: TRANSACTION_ENU_TRANSACTIONSUBSTATE
+        description: >
+          Lookup table for transaction substate codes (NEW, SUBMITTED, RECEIVED, COMPLETED, CANCELED, etc.).
+
       ################### Transaction Sources : Fact tables ####################
       - name: TRANSACTION_TRX_TRANSACTION
         description: >
@@ -83,6 +117,26 @@ sources:
           Part sourcing and catalog records associated with transactions.
           Supports part validation, alternates, substitutions, and pricing analysis.
           Primary source for fct_partpool.
+
+      - name: TRANSACTION_ENU_DOCUMENTTYPE
+        description: >
+          Lookup table for document type codes (PRELIMINARY, CONTRACTUAL, FINALIZED, MISC).
+
+      - name: TRANSACTION_ENU_DOCUMENTSUBTYPE
+        description: >
+          Lookup table for document subtype codes (REQUEST_QUOTE, PURCHASE_ORDER, INVOICE, SHIPMENT, etc.).
+
+      - name: TRANSACTION_ENU_DOCUMENTSTATE
+        description: >
+          Lookup table for document state codes (OPEN, CLOSED, VOID).
+
+      - name: TRANSACTION_ENU_DOCUMENTSUBSTATE
+        description: >
+          Lookup table for document substate codes.
+
+      - name: TRANSACTION_ENU_PAYMENTMETHOD
+        description: >
+          Lookup table for payment method codes (COD, BILLEXISTINGACCOUNT, CREDITCARD, etc.).
 
       - name: PMAPROGRAM_XRF_LINEITEM
         description: >
